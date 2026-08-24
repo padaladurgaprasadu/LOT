@@ -1,6 +1,6 @@
 # LOT - Autonomous AI Agent
 
-**LOT** is a modern, dark-themed AI Agent web interface powered by **NVIDIA NIM** free models (DeepSeek-R1, Llama 3.3 70B, NVIDIA Nemotron 70B, Mistral Large 2, Qwen 2.5 72B).
+**LOT** is a modern, dark-themed AI Agent web interface 
 
 Developed by **Durga prasadu padala**.
 
@@ -17,7 +17,7 @@ Developed by **Durga prasadu padala**.
   - **Chat History**: Categorized by Today, Yesterday, and Previous 7 Days with rename and delete options.
   - **User Profile**: Bottom card with account settings and Sign In / Sign Up modal.
 - **Top Bar**:
-  - Model Selector (Switch between DeepSeek-R1, Llama 3.3 70B, Nemotron, Mistral).
+  - Model Selector .
   - API Key status indicator & settings modal.
   - Share button (Copy link, export formatted Markdown, download JSON).
 - **Hero Screen**:
@@ -43,11 +43,10 @@ Developed by **Durga prasadu padala**.
 npm install
 ```
 
-### 2. Configure NVIDIA API Key (Optional)
-You can get a free API key at [build.nvidia.com](https://build.nvidia.com).
+### 2. Configure your API Key (Optional)
 Either add it in the app's **Settings (⚙)** modal or create `.env.local`:
 ```bash
-NVIDIA_API_KEY=nvapi-your-key-here
+YOUR_API_KEY=your-key-here
 ```
 
 ### 3. Run Development Server
