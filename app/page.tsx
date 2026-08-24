@@ -1,18 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Header } from "@/components/Header";
-import { Sidebar } from "@/components/Sidebar";
-import { WelcomeHero } from "@/components/WelcomeHero";
-import { MessageItem } from "@/components/MessageItem";
-import { ChatInput } from "@/components/ChatInput";
-import { ScheduleTasksModal } from "@/components/ScheduleTasksModal";
-import { ProjectsModal } from "@/components/ProjectsModal";
-import { AuthModal } from "@/components/AuthModal";
-import { SettingsModal } from "@/components/SettingsModal";
-import { ShareModal } from "@/components/ShareModal";
-import { MeetingAssistantModal } from "@/components/MeetingAssistantModal";
-import { SkillsMarketplaceModal } from "@/components/SkillsMarketplaceModal";
+import { Header } from "../components/Header";
+import { Sidebar } from "../components/Sidebar";
+import { WelcomeHero } from "../components/WelcomeHero";
+import { MessageItem } from "../components/MessageItem";
+import { ChatInput } from "../components/ChatInput";
+import { ScheduleTasksModal } from "../components/ScheduleTasksModal";
+import { ProjectsModal } from "../components/ProjectsModal";
+import { AuthModal } from "../components/AuthModal";
+import { SettingsModal } from "../components/SettingsModal";
+import { ShareModal } from "../components/ShareModal";
+import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
+import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
 import {
   DEFAULT_USER,
   getStoredModel,
@@ -27,9 +27,9 @@ import {
   setStoredProjects,
   getStoredTasks,
   setStoredTasks,
-} from "@/lib/storage";
-import { Conversation, Message, Project, ScheduledTask, UserProfile, Attachment, EntityHeroData } from "@/lib/types";
-import { DEFAULT_MODEL_ID, LOT_SYSTEM_PROMPT } from "@/lib/nvidia";
+} from "../lib/storage";
+import { Conversation, Message, Project, ScheduledTask, UserProfile, Attachment, EntityHeroData } from "../lib/types";
+import { DEFAULT_MODEL_ID, LOT_SYSTEM_PROMPT } from "../lib/nvidia";
 
 export default function Home() {
   // Sidebar & Modals state
