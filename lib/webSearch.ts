@@ -1,22 +1,19 @@
 /**
  * LOT AI Real-Time Web Search & Grounding Engine
- * Dynamic live search extractor for current news, 2024-2030 announcements, exam notifications, and live events.
+ * ALWAYS-ON live search for current, factual, real-world information.
  */
 
 export function requiresWebSearch(query: string): boolean {
   const lower = query.toLowerCase().trim();
 
-  // Exclude pure conversational greetings or pure programming syntax requests
-  if (/^(hello|hi|hey|good\s+morning|who\s+are\s+you|thanks|thank\s+you)\b/i.test(lower)) return false;
-  if (/^(write\s+a\s+function|write\s+a\s+class|implement\s+a\s+binary\s+tree|regex\s+for|sql\s+query\s+to)\b/i.test(lower)) return false;
+  // Skip ONLY pure greetings
+  if (/^(hello|hi|hey|good\s+morning|who\s+are\s+you|thanks|thank\s+you)[\s!?.]*$/i.test(lower)) return false;
 
-  // Broad dynamic detection for real-world knowledge, exams, current events, and dates
-  return (
-    /\b(gate|jee|upsc|cat|neet|bitsat|gre|gmat|toefl|exam|registration|admissions|application|notification|dates|schedule|portal|goaps|counseling|cutoff|result|score)\b/i.test(lower) ||
-    /\b(202[4-9]|203[0-9]|latest|recent|current|upcoming|today|news|released|release|announced|announcement|brochure|schedule)\b/i.test(lower) ||
-    /\b(movie|film|actor|actress|director|cast|box office|review|winner|election|ceo|founder|stock|price|valuation)\b/i.test(lower) ||
-    /^(who\s+is|when\s+is|what\s+is\s+the\s+date|where\s+is|tell\s+me\s+about|what\s+happened|latest\s+on)\b/i.test(lower)
-  );
+  // Skip ONLY pure code-writing requests (not explanations)
+  if (/^(write\s+a\s+(function|class|script|program)|implement\s+a\s+binary\s+tree|regex\s+for|sql\s+query\s+to|create\s+a\s+react\s+component)\b/i.test(lower)) return false;
+
+  // ALWAYS search for everything else — knowledge, places, people, science, health, food, tech, news, exams, etc.
+  return true;
 }
 
 export async function performLiveWebSearch(query: string): Promise<string | null> {
@@ -26,13 +23,14 @@ export async function performLiveWebSearch(query: string): Promise<string | null
   try {
     const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(cleanQuery)}`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3200);
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
       },
       signal: controller.signal,
     });
@@ -46,13 +44,15 @@ export async function performLiveWebSearch(query: string): Promise<string | null
     const regex = /<a class="result__snippet[^>]*>([\s\S]*?)<\/a>/g;
     let match: RegExpExecArray | null;
 
-    while ((match = regex.exec(html)) !== null && snippets.length < 8) {
+    while ((match = regex.exec(html)) !== null && snippets.length < 10) {
       const text = match[1]
         .replace(/<[^>]+>/g, "")
         .replace(/&amp;/g, "&")
         .replace(/&#x27;/g, "'")
         .replace(/&quot;/g, '"')
         .replace(/&nbsp;/g, " ")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
         .replace(/\s+/g, " ")
         .trim();
 

@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
     if (webGrounding) {
       formattedMessages.push({
         role: "system",
-        content: `MANDATORY REAL-TIME GROUNDING (CRITICAL: Prioritize these live web facts over any offline training assumptions):\n${webGrounding}`,
+        content: `MANDATORY REAL-TIME GROUNDING (CRITICAL: Use these live web facts as your primary source. Do NOT rely on training data alone):\n${webGrounding}\n\nFORMATTING REMINDER: Structure your response with ## headings, ### subheadings, bullet points, and tables. NEVER output a single paragraph. Break content into 5+ distinct sections minimum.`,
       });
     }
 

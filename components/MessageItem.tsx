@@ -31,41 +31,58 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   if (!content) return "";
   let formatted = content;
 
-  // 1. Convert Setext-style multi-line or inline "Title ==================== Rest" -> "## Title\n\nRest"
+  // 1. Convert inline Setext "Title ==================== Rest" -> "## Title\n\nRest"
   formatted = formatted.replace(
-    /(?:^|\n)(?:\*\*)?([A-Za-z0-9\s/&,.:()]{2,60}?)(?:\*\*)?\s*={3,}\s*([\s\S]*?)(?=\n[A-Za-z0-9]|\n\n|$)/g,
-    (match, p1, p2) => {
-      const heading = p1.trim();
-      const rest = p2 ? p2.trim() : "";
-      return `\n\n## ${heading}\n\n${rest}`;
-    }
+    /(?:^|\n)(?:\*\*)?([A-Za-z0-9][A-Za-z0-9\s/&,.:()'-]{1,80}?)(?:\*\*)?\s*={3,}\s*/g,
+    (_, p1) => `\n\n## ${p1.trim()}\n\n`
   );
 
-  // 2. Convert Setext-style multi-line or inline "Title -------------------- Rest" -> "### Title\n\nRest"
+  // 2. Convert inline Setext "Title -------------------- Rest" -> "### Title\n\nRest"
   formatted = formatted.replace(
-    /(?:^|\n)(?:\*\*)?([A-Za-z0-9\s/&,.:()]{2,60}?)(?:\*\*)?\s*-{3,}\s*([\s\S]*?)(?=\n[A-Za-z0-9]|\n\n|$)/g,
-    (match, p1, p2) => {
-      const heading = p1.trim();
-      const rest = p2 ? p2.trim() : "";
-      return `\n\n### ${heading}\n\n${rest}`;
-    }
+    /(?:^|\n)(?:\*\*)?([A-Za-z0-9][A-Za-z0-9\s/&,.:()'-]{1,80}?)(?:\*\*)?\s*-{3,}\s*/g,
+    (_, p1) => `\n\n### ${p1.trim()}\n\n`
   );
 
   // 3. Remove all stray standalone === or --- underlines
   formatted = formatted.replace(/^\s*={3,}\s*$/gm, "");
   formatted = formatted.replace(/^\s*-{3,}\s*$/gm, "");
 
-  // 4. Ensure clean line-break before numbered list items
-  formatted = formatted.replace(/([^\n])\s*\n\s*(\d+\.\s+)/g, "$1\n\n$2");
+  // 4. Expand inline ### or ## that got collapsed into a single line with text
+  //    e.g. "some text ### Heading More text" -> "some text\n\n### Heading\n\nMore text"
+  formatted = formatted.replace(
+    /([.!?:,])\s*(#{2,3})\s+(\d+\.\s+)?(?:\*\*)?([A-Za-z][A-Za-z0-9\s,&/'-]{2,60}?)(?:\*\*)?\s*/g,
+    (_, punct, hashes, numPrefix, title) => {
+      const num = numPrefix ? numPrefix.trim() + " " : "";
+      return `${punct}\n\n${hashes} ${num}${title.trim()}\n\n`;
+    }
+  );
 
-  // 5. Ensure clean line-break before bullet points
-  formatted = formatted.replace(/([^\n])\s*\n\s*([*•-])\s+/g, "$1\n\n$2 ");
+  // 5. Break inline bold section headers that appear mid-paragraph
+  //    e.g. "end of sentence. **New Section Title** The next content..." 
+  formatted = formatted.replace(
+    /([.!?])\s+\*\*([A-Z][A-Za-z0-9\s,&/()'-]{3,50}?)\*\*\s+/g,
+    (_, punct, title) => `${punct}\n\n### ${title.trim()}\n\n`
+  );
 
-  // 6. Clean up excessive newlines
-  formatted = formatted.replace(/\n{3,}/g, "\n\n");
+  // 6. Ensure line break before numbered list items
+  formatted = formatted.replace(/([^\n])\s*\n?\s*(\d+\.\s+)/g, "$1\n\n$2");
+
+  // 7. Ensure line break before bullet points
+  formatted = formatted.replace(/([^\n])\s*\n?\s*([*•-])\s+/g, "$1\n\n$2 ");
+
+  // 8. Break apart sentences that contain "markdown" or "```" artifacts inline with text
+  formatted = formatted.replace(/([.!?])\s*```(\w*)\s*/g, "$1\n\n```$2\n");
+
+  // 9. Ensure blank lines around code fences
+  formatted = formatted.replace(/([^\n])\n```/g, "$1\n\n```");
+  formatted = formatted.replace(/```\n([^\n])/g, "```\n\n$1");
+
+  // 10. Clean up excessive newlines
+  formatted = formatted.replace(/\n{4,}/g, "\n\n\n");
 
   return formatted.trim();
 }
+
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
