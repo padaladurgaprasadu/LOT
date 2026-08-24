@@ -25,7 +25,7 @@ export async function transcribeAudioWithWhisper(
   if (apiKey) {
     try {
       const formData = new FormData();
-      const blob = new Blob([audioBuffer], { type: mimeType });
+      const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
       formData.append("file", blob, fileName);
       formData.append("model", "whisper-1");
       formData.append("response_format", "verbose_json");

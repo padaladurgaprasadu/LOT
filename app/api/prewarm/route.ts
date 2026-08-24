@@ -9,9 +9,9 @@ const prewarmAgent = new https.Agent({
   maxSockets: 50,
 });
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   // Ultra-lightweight HEAD ping to keep TLS connection warm
-  return new Promise((resolve) => {
+  return new Promise<NextResponse>((resolve) => {
     const req = https.request(
       {
         hostname: "integrate.api.nvidia.com",
