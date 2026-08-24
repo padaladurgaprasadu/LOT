@@ -1,0 +1,316 @@
+import { NextRequest, NextResponse } from "next/server";
+import dns from "node:dns";
+import https from "node:https";
+import { LOT_SYSTEM_PROMPT, DEFAULT_MODEL_ID } from "@/lib/nvidia";
+import { checkRateLimit } from "@/lib/rateLimiter";
+import { verifyJwt } from "@/lib/auth";
+import { resolveEntityHero } from "@/lib/entityHero";
+import { globalResponseCache } from "@/lib/responseCache";
+import { analyzeQuery } from "@/lib/queryRouter";
+import { performLiveWebSearch, requiresWebSearch } from "@/lib/webSearch";
+
+// 1. Enforce IPv4-first to eliminate DNS/NAT64 handshake latency
+dns.setDefaultResultOrder("ipv4first");
+
+export const runtime = "nodejs";
+
+// 4. Reduce network hops: Persistent Keep-Alive Socket Pool with 0ms connection reuse
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 120000,
+  maxSockets: 100,
+  maxFreeSockets: 50,
+  timeout: 30000,
+});
+
+async function streamFromNvidia(
+  model: string,
+  messages: any[],
+  apiKey: string,
+  onChunk: (chunk: Buffer) => void,
+  onDelta: (text: string) => void,
+  timeoutMs = 4500
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model,
+      messages,
+      temperature: 0.55,
+      top_p: 0.9,
+      max_tokens: 4096,
+      stream: true,
+    });
+
+    let completed = false;
+
+    const req = https.request(
+      {
+        hostname: "integrate.api.nvidia.com",
+        port: 443,
+        path: "/v1/chat/completions",
+        method: "POST",
+        agent: httpsAgent,
+        family: 4,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Length": Buffer.byteLength(postData),
+          Connection: "keep-alive",
+        },
+      },
+      (res) => {
+        if (res.statusCode && res.statusCode >= 400) {
+          let errBody = "";
+          res.on("data", (d) => (errBody += d));
+          res.on("end", () => {
+            completed = true;
+            reject(new Error(`HTTP ${res.statusCode}: ${errBody}`));
+          });
+          return;
+        }
+
+        res.on("data", (chunk: Buffer) => {
+          onChunk(chunk);
+          const chunkStr = chunk.toString();
+          const lines = chunkStr.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("data:") && trimmed !== "data: [DONE]") {
+              try {
+                const parsed = JSON.parse(trimmed.replace(/^data:\s*/, ""));
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) onDelta(delta);
+              } catch {}
+            }
+          }
+        });
+
+        res.on("end", () => {
+          completed = true;
+          resolve();
+        });
+
+        res.on("error", (err) => {
+          if (!completed) {
+            completed = true;
+            reject(err);
+          }
+        });
+      }
+    );
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Timeout after ${timeoutMs}ms`));
+    });
+
+    req.on("error", (err) => {
+      if (!completed) {
+        completed = true;
+        reject(err);
+      }
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+export async function POST(req: NextRequest) {
+  const reqStart = Date.now();
+  try {
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "anonymous";
+    const rateCheck = checkRateLimit(`chat_${ip}`, 120, 60 * 1000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Rate limit reached. Please wait ${rateCheck.resetInSec}s.` },
+        { status: 429 }
+      );
+    }
+
+    // 1. Token Verification
+    const token = req.cookies.get("lot_session_token")?.value;
+    const session = token ? verifyJwt(token) : null;
+    if (!session) {
+      return NextResponse.json(
+        { error: "Authentication required. Please sign in or create an account to use LOT AI." },
+        { status: 401 }
+      );
+    }
+
+    const { messages, customPrompt, attachment } = await req.json();
+
+    const activeApiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
+    if (!activeApiKey) {
+      return NextResponse.json(
+        { error: "Server API Key is not configured in .env.local." },
+        { status: 500 }
+      );
+    }
+
+    const lastUserMessage = (messages[messages.length - 1]?.content || "").trim();
+
+    // 2. Autonomous Dynamic Auto-Routing
+    let targetModel = "meta/llama-3.1-70b-instruct";
+    if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
+      targetModel = "meta/muse-glimmer-30b";
+    } else if (/^(hello|hi|hey|good\s+morning|who\s+are\s+you|thanks|thank\s+you)\b/i.test(lastUserMessage.toLowerCase().trim())) {
+      // Lightning 8B for instant conversational greetings
+      targetModel = "meta/llama-3.1-8b-instruct";
+    } else {
+      // Flagship 70B for all technical definitions, science, algorithms, world knowledge & code
+      targetModel = "meta/llama-3.1-70b-instruct";
+    }
+
+    // 3. In-Memory LRU Cache Hit (Pillar 3: Add Caching, < 2ms instant response)
+    if (!attachment && messages.length <= 2 && lastUserMessage) {
+      const cached = globalResponseCache.get(lastUserMessage, targetModel);
+      if (cached) {
+        const encoder = new TextEncoder();
+        const cachedStream = new ReadableStream({
+          async start(controller) {
+            if (cached.hero) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ hero: cached.hero })}\n\n`));
+            }
+            const chunkSize = 24;
+            for (let i = 0; i < cached.content.length; i += chunkSize) {
+              const chunk = cached.content.slice(i, i + chunkSize);
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: chunk } }] })}\n\n`)
+              );
+              await new Promise((r) => setTimeout(r, 2));
+            }
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+
+        return new Response(cachedStream, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+            "X-LOT-Cache": "HIT",
+            "X-Response-Time": `${Date.now() - reqStart}ms`,
+          },
+        });
+      }
+    }
+
+    // 4. Parallel Non-Blocking Pre-flight Resolution (Pillar 4: Reduce Network Hops)
+    const analysis = analyzeQuery(lastUserMessage, !!attachment);
+    const [resolvedHero, webGrounding] = await Promise.all([
+      analysis.requiresHero && lastUserMessage ? resolveEntityHero(lastUserMessage) : Promise.resolve(null),
+      requiresWebSearch(lastUserMessage) ? performLiveWebSearch(lastUserMessage) : Promise.resolve(null),
+    ]);
+
+    // 5. Build Formatted Context
+    let formattedMessages: any[] = [
+      {
+        role: "system",
+        content: customPrompt || LOT_SYSTEM_PROMPT,
+      },
+    ];
+
+    if (webGrounding) {
+      formattedMessages.push({
+        role: "system",
+        content: `MANDATORY REAL-TIME GROUNDING (CRITICAL: Prioritize these live web facts over any offline training assumptions):\n${webGrounding}`,
+      });
+    }
+
+    if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
+      formattedMessages.push({
+        role: "user",
+        content: [
+          { type: "text", text: lastUserMessage || "Analyze this image." },
+          { type: "image_url", image_url: { url: attachment.dataUrl } },
+        ],
+      });
+    } else {
+      const leanHistory = messages.slice(-8);
+      formattedMessages = [
+        ...formattedMessages,
+        ...leanHistory.map((m: { role: string; content: string }) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      ];
+    }
+
+    // 6. Dual-Stream Controller with Self-Healing Fallback
+    let collectedFullResponse = "";
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+
+        // Guaranteed Chunk 0 Hero visual metadata
+        if (resolvedHero) {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ hero: resolvedHero })}\n\n`));
+          } catch {}
+        }
+
+        try {
+          await streamFromNvidia(
+            targetModel,
+            formattedMessages,
+            activeApiKey,
+            (chunk) => controller.enqueue(chunk),
+            (delta) => (collectedFullResponse += delta),
+            targetModel === "meta/llama-3.1-8b-instruct" ? 8000 : 4500
+          );
+        } catch (primaryErr: any) {
+          // Automatic Self-Healing Fallback to 8B on error or queue timeout
+          if (targetModel !== "meta/llama-3.1-8b-instruct" && !attachment) {
+            try {
+              await streamFromNvidia(
+                "meta/llama-3.1-8b-instruct",
+                formattedMessages,
+                activeApiKey,
+                (chunk) => controller.enqueue(chunk),
+                (delta) => (collectedFullResponse += delta),
+                8000
+              );
+            } catch (fallbackErr: any) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ Error: ${fallbackErr.message}` } }] })}\n\n`)
+              );
+            }
+          } else {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ Error: ${primaryErr.message}` } }] })}\n\n`)
+            );
+          }
+        }
+
+        // 5. Async Caching (Pillar 5: Async everything - off the critical streaming path)
+        if (lastUserMessage && collectedFullResponse) {
+          globalResponseCache.set(lastUserMessage, targetModel, collectedFullResponse, resolvedHero);
+        }
+
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        try {
+          controller.close();
+        } catch {}
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+        "X-LOT-Model": targetModel,
+        "X-LOT-Cache": "MISS",
+      },
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to process chat request." },
+      { status: 500 }
+    );
+  }
+}
