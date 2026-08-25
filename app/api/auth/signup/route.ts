@@ -26,8 +26,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Valid email address is required" }, { status: 400 });
     }
 
-    if (!password || typeof password !== "string" || password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    if (!password || typeof password !== "string") {
+      return NextResponse.json({ error: "Password is required" }, { status: 400 });
+    }
+
+    // Strict Password Validation
+    if (password.length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters long" }, { status: 400 });
+    }
+    if (!/[A-Z]/.test(password)) {
+      return NextResponse.json({ error: "Password must contain at least one uppercase letter (A-Z)" }, { status: 400 });
+    }
+    if (!/[a-z]/.test(password)) {
+      return NextResponse.json({ error: "Password must contain at least one lowercase letter (a-z)" }, { status: 400 });
+    }
+    if (!/[0-9]/.test(password)) {
+      return NextResponse.json({ error: "Password must contain at least one number (0-9)" }, { status: 400 });
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return NextResponse.json({ error: "Password must contain at least one special character (!@#$%^&*...)" }, { status: 400 });
     }
 
     const existing = findUserByEmail(email);
