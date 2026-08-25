@@ -463,6 +463,23 @@ export default function Home() {
             if (delta && delta.content) {
               streamedContent += delta.content;
 
+              // Buffer incomplete heading lines: if the last line starts with ## but has no \n after it,
+              // hold it back so ReactMarkdown doesn't render a split heading like "Typ" / "es of Loops"
+              let displayContent = streamedContent;
+              const lastNewline = displayContent.lastIndexOf("\n");
+              const lastLine = lastNewline >= 0 ? displayContent.slice(lastNewline + 1) : displayContent;
+              if (/^#{1,4}\s+\S/.test(lastLine) && !lastLine.endsWith("\n")) {
+                // Last line is an in-progress heading — show everything up to it
+                if (lastNewline >= 0) {
+                  displayContent = displayContent.slice(0, lastNewline + 1);
+                }
+                // If the entire content is just a heading being built, show nothing yet
+                // unless it's been more than 60 chars (heading is definitely complete)
+                else if (lastLine.length < 60) {
+                  displayContent = "";
+                }
+              }
+
               // Instant live update
               setConversations((prev) =>
                 prev.map((c) => {
@@ -473,7 +490,7 @@ export default function Home() {
                       m.id === assistantMessageId
                         ? {
                             ...m,
-                            content: streamedContent,
+                            content: displayContent || streamedContent,
                             heroImage: m.heroImage || resolvedHeroData || undefined,
                           }
                         : m

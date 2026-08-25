@@ -31,6 +31,20 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   if (!content) return "";
   let formatted = content;
 
+  // 0. HEADING REPAIR: Rejoin split headings where "## Typ\nes of Loops" -> "## Types of Loops"
+  //    Pattern: a line starting with ## or ### followed by a short fragment (1-15 chars),
+  //    then the VERY NEXT line has lowercase continuation text (not a new heading/list/code)
+  formatted = formatted.replace(
+    /^(#{1,4}\s+\S{1,15})\n([a-z][^\n]{0,80})$/gm,
+    "$1$2"
+  );
+
+  // 0b. Also rejoin bold-split headings like "**Ben**\nefits of..." -> "**Benefits of...**"
+  formatted = formatted.replace(
+    /\*\*([A-Z][a-z]{1,12})\*\*\n([a-z][^\n]{0,80})/g,
+    "**$1$2**"
+  );
+
   // 1. Convert inline Setext "Title ==================== Rest" -> "## Title\n\nRest"
   formatted = formatted.replace(
     /(?:^|\n)(?:\*\*)?([A-Za-z0-9][A-Za-z0-9\s/&,.:()'-]{1,80}?)(?:\*\*)?\s*={3,}\s*/g,
@@ -48,7 +62,6 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   formatted = formatted.replace(/^\s*-{3,}\s*$/gm, "");
 
   // 4. Expand inline ### or ## that got collapsed into a single line with text
-  //    e.g. "some text ### Heading More text" -> "some text\n\n### Heading\n\nMore text"
   formatted = formatted.replace(
     /([.!?:,])\s*(#{2,3})\s+(\d+\.\s+)?(?:\*\*)?([A-Za-z][A-Za-z0-9\s,&/'-]{2,60}?)(?:\*\*)?\s*/g,
     (_, punct, hashes, numPrefix, title) => {
@@ -58,7 +71,6 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   );
 
   // 5. Break inline bold section headers that appear mid-paragraph
-  //    e.g. "end of sentence. **New Section Title** The next content..." 
   formatted = formatted.replace(
     /([.!?])\s+\*\*([A-Z][A-Za-z0-9\s,&/()'-]{3,50}?)\*\*\s+/g,
     (_, punct, title) => `${punct}\n\n### ${title.trim()}\n\n`
@@ -70,7 +82,7 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   // 7. Ensure line break before bullet points
   formatted = formatted.replace(/([^\n])\s*\n?\s*([*•-])\s+/g, "$1\n\n$2 ");
 
-  // 8. Break apart sentences that contain "markdown" or "```" artifacts inline with text
+  // 8. Break apart sentences that contain code fences inline with text
   formatted = formatted.replace(/([.!?])\s*```(\w*)\s*/g, "$1\n\n```$2\n");
 
   // 9. Ensure blank lines around code fences
