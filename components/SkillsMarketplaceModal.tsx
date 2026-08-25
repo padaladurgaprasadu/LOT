@@ -16,6 +16,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Scale: <Scale className="w-5 h-5 text-purple-400" />,
   Activity: <Activity className="w-5 h-5 text-rose-400" />,
   Palette: <Palette className="w-5 h-5 text-pink-400" />,
+  Sparkles: <Sparkles className="w-5 h-5 text-indigo-400" />,
 };
 
 export function SkillsMarketplaceModal({ isOpen, onClose }: SkillsMarketplaceModalProps) {
@@ -49,7 +50,7 @@ export function SkillsMarketplaceModal({ isOpen, onClose }: SkillsMarketplaceMod
     } catch {}
   };
 
-  const categories = ["all", "coding", "security", "finance", "legal", "healthcare"];
+  const categories = ["all", "coding", "security", "productivity", "design", "finance", "legal", "healthcare"];
 
   const filteredSkills = skills.filter((s) => {
     const matchesCat = selectedCategory === "all" || s.category === selectedCategory;

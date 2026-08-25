@@ -6,6 +6,103 @@
 import { SkillManifest } from "./skillRegistry";
 
 export const AWESOME_SKILLS_CATALOG: SkillManifest[] = [
+  // 1. Supabase Cloud Database & Vector RAG
+  {
+    id: "supabase-pgvector",
+    name: "Supabase & pgvector Cloud Architecture",
+    category: "coding",
+    version: "2.5.0",
+    description: "PostgreSQL schema engineering, Supabase Auth (OAuth/MFA/RLS), Realtime WebSocket sync, and pgvector HNSW semantic search for RAG.",
+    author: "Supabase Core",
+    enabled: true,
+    systemDirective: "Architect scalable Supabase PostgreSQL schemas, implement row-level security (RLS), configure pgvector cosine distance embeddings, and structure serverless auth.",
+    iconName: "Activity",
+  },
+  // 2. LangGraph Stateful Multi-Agent Graphs
+  {
+    id: "langgraph-multiagent",
+    name: "LangGraph Cyclic Multi-Agent Orchestration",
+    category: "coding",
+    version: "1.2.0",
+    description: "Stateful agent state machines with cyclic self-healing loops (Plan -> Code -> Lint -> Test -> Self-Correct), checkpointers, and time-travel debugging.",
+    author: "LangChain AI",
+    enabled: true,
+    systemDirective: "Construct stateful multi-agent graphs with typed state channels, conditional edge routers, checkpointer persistence, and human-in-the-loop validation.",
+    iconName: "Layout",
+  },
+  // 3. Langflow Visual Workflow Builder
+  {
+    id: "langflow-visual-builder",
+    name: "Langflow Visual Agent & RAG Builder",
+    category: "productivity",
+    version: "1.1.0",
+    description: "Visual node-based canvas for assembling RAG pipelines, dynamic memory chains, custom tool bindings, and exportable REST/WebSocket APIs.",
+    author: "Langflow AI",
+    enabled: true,
+    systemDirective: "Design modular visual AI workflows, custom Langflow components, vector store retrieval nodes, and API export architectures.",
+    iconName: "Sparkles",
+  },
+  // 4. ECC Agent Harness & Instinct Engineering
+  {
+    id: "ecc-agent-harness",
+    name: "ECC Agent Harness & Instincts",
+    category: "productivity",
+    version: "1.0.0",
+    description: "Agent harness optimization: layered instincts, token budget guardrails, execution hooks, and research-first subagent coordination for Claude Code/Codex.",
+    author: "affaan-m",
+    enabled: true,
+    systemDirective: "Optimize agent execution harnesses, design context-efficient instincts, enforce execution security hooks, and streamline multi-step developer routines.",
+    iconName: "TrendingUp",
+  },
+  // 5. Odysseus Private AI Workspace
+  {
+    id: "odysseus-private-workspace",
+    name: "Odysseus Private Local-First Workspace",
+    category: "security",
+    version: "1.0.0",
+    description: "Self-hosted private AI workspace architecture, local model serving (Ollama, KoboldCpp, vLLM), zero-leakage sandboxing, and private document processing.",
+    author: "odysseus-dev",
+    enabled: true,
+    systemDirective: "Implement local-first zero-telemetry architectures, private model serving pipelines, and isolated self-hosted workspace environments.",
+    iconName: "ShieldAlert",
+  },
+  // 6. Karpathy AutoResearch Autonomous Optimization
+  {
+    id: "karpathy-autoresearch",
+    name: "Karpathy AutoResearch Optimization Loop",
+    category: "coding",
+    version: "1.0.0",
+    description: "Autonomous iterative research loops: Hypothesize -> Modify -> Benchmark -> Keep/Discard -> Repeat for automatic algorithm refactoring and ML training.",
+    author: "Andrej Karpathy",
+    enabled: true,
+    systemDirective: "Construct metric-driven autonomous research loops that iteratively benchmark code changes, keep winning diffs, and discard regressions.",
+    iconName: "TrendingUp",
+  },
+  // 7. YouTube Stream & Multimodal Ingestion
+  {
+    id: "youtube-media-ingestion",
+    name: "YouTube & Multimodal Stream Ingestion",
+    category: "productivity",
+    version: "2.0.0",
+    description: "Media stream extraction via yt-dlp & ytdl-core: audio stream splitting, subtitle/VTT transcript parsing, and long-video semantic RAG.",
+    author: "yt-dlp Community",
+    enabled: true,
+    systemDirective: "Process YouTube URLs, parse VTT subtitles, extract audio streams for Whisper transcription, and build timestamp-indexed video summaries.",
+    iconName: "Sparkles",
+  },
+  // 8. Video-ShotCraft Motion Design Studio
+  {
+    id: "video-shotcraft-motion",
+    name: "Video-ShotCraft Remotion Motion Studio",
+    category: "design",
+    version: "1.0.0",
+    description: "Programmatic React video animation studio using Remotion, 152 shot recipe presets, 149 scene SFX, beat-sync audio design, and CapCut/JianYing draft export.",
+    author: "Vincentwei1021",
+    enabled: true,
+    systemDirective: "Synthesize programmatic Remotion React video compositions, apply cinematic camera shot recipes, sync audio beats, and animate static product screenshots.",
+    iconName: "Palette",
+  },
+  // Core catalog skills
   {
     id: "perplexity-mcp-search",
     name: "Perplexity Real-Time Research (MCP)",

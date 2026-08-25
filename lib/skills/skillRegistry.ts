@@ -9,7 +9,7 @@ import { AWESOME_SKILLS_CATALOG } from "./awesomeSkillsCatalog";
 export interface SkillManifest {
   id: string;
   name: string;
-  category: "coding" | "security" | "finance" | "legal" | "healthcare" | "productivity";
+  category: "coding" | "security" | "finance" | "legal" | "healthcare" | "productivity" | "design";
   version: string;
   description: string;
   author: string;
