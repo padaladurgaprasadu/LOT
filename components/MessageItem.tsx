@@ -31,65 +31,52 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   if (!content) return "";
   let formatted = content;
 
-  // 0. HEADING REPAIR: Rejoin split headings where "## Typ\nes of Loops" -> "## Types of Loops"
-  //    Pattern: a line starting with ## or ### followed by a short fragment (1-15 chars),
-  //    then the VERY NEXT line has lowercase continuation text (not a new heading/list/code)
+  // 1. Expand inline headings that appear on the same line after sentence punctuation
+  //    e.g. "...in a program. ### Types of Loops" -> "...in a program.\n\n### Types of Loops\n\n"
   formatted = formatted.replace(
-    /^(#{1,4}\s+\S{1,15})\n([a-z][^\n]{0,80})$/gm,
-    "$1$2"
+    /([.!?])\s*(#{1,6}\s+[^\n]+)/g,
+    "$1\n\n$2\n\n"
   );
 
-  // 0b. Also rejoin bold-split headings like "**Ben**\nefits of..." -> "**Benefits of...**"
+  // 2. Convert Setext H1 (Title followed by === underline) -> "## Title"
   formatted = formatted.replace(
-    /\*\*([A-Z][a-z]{1,12})\*\*\n([a-z][^\n]{0,80})/g,
-    "**$1$2**"
+    /(?:^|\n)([^\n=]+?)\s*\n\s*={3,}\s*(?=\n|$)/g,
+    "\n\n## $1\n\n"
   );
 
-  // 1. Convert inline Setext "Title ==================== Rest" -> "## Title\n\nRest"
+  // 3. Convert Setext H2 (Title followed by --- underline) -> "### Title"
   formatted = formatted.replace(
-    /(?:^|\n)(?:\*\*)?([A-Za-z0-9][A-Za-z0-9\s/&,.:()'-]{1,80}?)(?:\*\*)?\s*={3,}\s*/g,
-    (_, p1) => `\n\n## ${p1.trim()}\n\n`
+    /(?:^|\n)([^\n\-]+?)\s*\n\s*-{3,}\s*(?=\n|$)/g,
+    "\n\n### $1\n\n"
   );
 
-  // 2. Convert inline Setext "Title -------------------- Rest" -> "### Title\n\nRest"
-  formatted = formatted.replace(
-    /(?:^|\n)(?:\*\*)?([A-Za-z0-9][A-Za-z0-9\s/&,.:()'-]{1,80}?)(?:\*\*)?\s*-{3,}\s*/g,
-    (_, p1) => `\n\n### ${p1.trim()}\n\n`
-  );
-
-  // 3. Remove all stray standalone === or --- underlines
+  // 4. Remove standalone leftover === or --- underline lines
   formatted = formatted.replace(/^\s*={3,}\s*$/gm, "");
   formatted = formatted.replace(/^\s*-{3,}\s*$/gm, "");
 
-  // 4. Expand inline ### or ## that got collapsed into a single line with text
+  // 5. Expand inline bold section headers that appear mid-paragraph
+  //    e.g. "...end of sentence. **Section Title** Next paragraph..."
   formatted = formatted.replace(
-    /([.!?:,])\s*(#{2,3})\s+(\d+\.\s+)?(?:\*\*)?([A-Za-z][A-Za-z0-9\s,&/'-]{2,60}?)(?:\*\*)?\s*/g,
-    (_, punct, hashes, numPrefix, title) => {
-      const num = numPrefix ? numPrefix.trim() + " " : "";
-      return `${punct}\n\n${hashes} ${num}${title.trim()}\n\n`;
-    }
+    /([.!?])\s+\*\*([A-Z][^\n*]{2,60}?)\*\*\s+(?=[A-Z0-9])/g,
+    "$1\n\n### $2\n\n"
   );
 
-  // 5. Break inline bold section headers that appear mid-paragraph
-  formatted = formatted.replace(
-    /([.!?])\s+\*\*([A-Z][A-Za-z0-9\s,&/()'-]{3,50}?)\*\*\s+/g,
-    (_, punct, title) => `${punct}\n\n### ${title.trim()}\n\n`
-  );
+  // 6. Ensure blank line before any heading (if not at very start)
+  formatted = formatted.replace(/([^\n])\n(#{1,6}\s+[^\n]+)/g, "$1\n\n$2");
 
-  // 6. Ensure line break before numbered list items
-  formatted = formatted.replace(/([^\n])\s*\n?\s*(\d+\.\s+)/g, "$1\n\n$2");
+  // 7. Ensure blank line after any heading
+  formatted = formatted.replace(/^(#{1,6}\s+[^\n]+)\n([^\n#])/gm, "$1\n\n$2");
 
-  // 7. Ensure line break before bullet points
-  formatted = formatted.replace(/([^\n])\s*\n?\s*([*•-])\s+/g, "$1\n\n$2 ");
+  // 8. Ensure clean line-break before numbered list items
+  formatted = formatted.replace(/([^\n])\n(\d+\.\s+)/g, "$1\n\n$2");
 
-  // 8. Break apart sentences that contain code fences inline with text
-  formatted = formatted.replace(/([.!?])\s*```(\w*)\s*/g, "$1\n\n```$2\n");
+  // 9. Ensure clean line-break before bullet points
+  formatted = formatted.replace(/([^\n])\n([*•-]\s+)/g, "$1\n\n$2");
 
-  // 9. Ensure blank lines around code fences
-  formatted = formatted.replace(/([^\n])\n```/g, "$1\n\n```");
-  formatted = formatted.replace(/```\n([^\n])/g, "```\n\n$1");
+  // 10. Ensure blank lines around code fences
+  formatted = formatted.replace(/([^\n])\n(```)/g, "$1\n\n$2");
 
-  // 10. Clean up excessive newlines
+  // 11. Normalize excessive newlines
   formatted = formatted.replace(/\n{4,}/g, "\n\n\n");
 
   return formatted.trim();
