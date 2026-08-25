@@ -205,19 +205,17 @@ export async function POST(req: NextRequest) {
     ]);
 
     // 5. Build Formatted Context
+    let baseSystemPrompt = customPrompt || LOT_SYSTEM_PROMPT;
+    if (webGrounding) {
+      baseSystemPrompt += `\n\n[VERIFIED REAL-TIME SEARCH RESULTS & LIVE INTERNET GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. You have active real-time web access. Use the above verified live search data as your absolute ground truth. NEVER state you have a knowledge cutoff or lack recent data. Answer directly with the latest facts.`;
+    }
+
     let formattedMessages: any[] = [
       {
         role: "system",
-        content: customPrompt || LOT_SYSTEM_PROMPT,
+        content: baseSystemPrompt,
       },
     ];
-
-    if (webGrounding) {
-      formattedMessages.push({
-        role: "system",
-        content: `MANDATORY REAL-TIME GROUNDING (CRITICAL: Use these live web facts as your primary source. Do NOT rely on training data alone):\n${webGrounding}\n\nFORMATTING REMINDER: Structure your response with ## headings, ### subheadings, bullet points, and tables. NEVER output a single paragraph. Break content into 5+ distinct sections minimum.`,
-      });
-    }
 
     if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
       formattedMessages.push({
@@ -229,12 +227,23 @@ export async function POST(req: NextRequest) {
       });
     } else {
       const leanHistory = messages.slice(-8);
-      formattedMessages = [
-        ...formattedMessages,
-        ...leanHistory.map((m: { role: string; content: string }) => ({
+      const processedHistory = leanHistory.map((m: { role: string; content: string }, idx: number) => {
+        // Inject live data context into the active user query
+        if (idx === leanHistory.length - 1 && m.role === "user" && webGrounding) {
+          return {
+            role: "user",
+            content: `${m.content}\n\n[LIVE SEARCH DATA]:\n${webGrounding}`,
+          };
+        }
+        return {
           role: m.role,
           content: m.content,
-        })),
+        };
+      });
+
+      formattedMessages = [
+        ...formattedMessages,
+        ...processedHistory,
       ];
     }
 
