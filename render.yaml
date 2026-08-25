@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: lot-ai
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.17.0
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: LOT_BACKEND_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_SECRET
+        sync: false
