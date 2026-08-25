@@ -91,6 +91,15 @@ export function ThreeSceneRunner({ type = "prism_chip", title = "3D Interactive 
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      // Dispose all geometries and materials to prevent GPU memory leaks
+      scene.traverse((obj) => {
+        if ((obj as THREE.Mesh).geometry) (obj as THREE.Mesh).geometry.dispose();
+        if ((obj as THREE.Mesh).material) {
+          const mat = (obj as THREE.Mesh).material;
+          if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+          else mat.dispose();
+        }
+      });
       renderer.dispose();
       if (containerRef.current && renderer.domElement) {
         containerRef.current.removeChild(renderer.domElement);

@@ -118,33 +118,35 @@ export async function resolveEntityHero(query: string): Promise<EntityHeroData |
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500);
 
-    // 1. Direct Summary Lookup
-    let hero = await fetchWikipediaSummary(target, controller.signal);
+    try {
+      // 1. Direct Summary Lookup
+      let hero = await fetchWikipediaSummary(target, controller.signal);
 
-    // 2. Fallback: Search API for variations in spelling / capitalization
-    if (!hero) {
-      const searchRes = await fetch(
-        `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(target)}&limit=1&namespace=0&format=json`,
-        {
-          headers: { "User-Agent": "LOT-Sovereign-Agent/1.0" },
-          signal: controller.signal,
-        }
-      );
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
-        const bestMatch = searchData?.[1]?.[0];
-        if (bestMatch && bestMatch.toLowerCase() !== target.toLowerCase()) {
-          hero = await fetchWikipediaSummary(bestMatch, controller.signal);
+      // 2. Fallback: Search API for variations in spelling / capitalization
+      if (!hero) {
+        const searchRes = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(target)}&limit=1&namespace=0&format=json`,
+          {
+            headers: { "User-Agent": "LOT-Sovereign-Agent/1.0" },
+            signal: controller.signal,
+          }
+        );
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          const bestMatch = searchData?.[1]?.[0];
+          if (bestMatch && bestMatch.toLowerCase() !== target.toLowerCase()) {
+            hero = await fetchWikipediaSummary(bestMatch, controller.signal);
+          }
         }
       }
-    }
 
-    clearTimeout(timeout);
-
-    if (hero) {
-      entityHeroCache.set(lower, hero);
-      entityHeroCache.set(hero.title.toLowerCase(), hero);
-      return hero;
+      if (hero) {
+        entityHeroCache.set(lower, hero);
+        entityHeroCache.set(hero.title.toLowerCase(), hero);
+        return hero;
+      }
+    } finally {
+      clearTimeout(timeout);
     }
 
     return null;

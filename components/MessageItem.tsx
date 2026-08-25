@@ -229,6 +229,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               onError={(e) => {
                 if (message.heroImage?.thumbnailUrl && e.currentTarget.src !== message.heroImage.thumbnailUrl) {
                   e.currentTarget.src = message.heroImage.thumbnailUrl;
+                } else {
+                  e.currentTarget.style.display = "none";
                 }
               }}
               className="w-full h-full object-cover rounded-2xl transition-all duration-200"

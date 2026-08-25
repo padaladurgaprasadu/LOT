@@ -357,7 +357,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            fetch("/api/prewarm").catch(() => {});
+            if (!(window as any).__lot_prewarmed) {
+              (window as any).__lot_prewarmed = true;
+              fetch("/api/prewarm").catch(() => {});
+            }
           }}
           placeholder={
             isTranscribing

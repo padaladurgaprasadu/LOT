@@ -48,7 +48,7 @@ export function checkRateLimit(
 }
 
 // Cleanup stale entries every 5 minutes using forEach
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   rateLimitMap.forEach((v, k) => {
     if (now > v.resetAt) {
@@ -56,3 +56,6 @@ setInterval(() => {
     }
   });
 }, 5 * 60 * 1000);
+if (typeof cleanupInterval === "object" && "unref" in cleanupInterval) {
+  cleanupInterval.unref();
+}

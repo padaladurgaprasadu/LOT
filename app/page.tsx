@@ -59,12 +59,16 @@ export default function Home() {
 
   // Load state and check server session on mount
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     setSelectedModel(getStoredModel());
 
     // Mandatory Authentication check
-    fetch("/api/auth/me")
+    fetch("/api/auth/me", { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
+        if (!isMounted) return;
         if (data.authenticated && data.user) {
           const profile: UserProfile = {
             id: data.user.id,
@@ -83,6 +87,7 @@ export default function Home() {
         }
       })
       .catch(() => {
+        if (!isMounted) return;
         const guest: UserProfile = { id: "guest", name: "", email: "", isLoggedIn: false };
         setUserProfile(guest);
         setAuthOpen(true);
@@ -96,6 +101,11 @@ export default function Home() {
     }
     setTasks(getStoredTasks());
     setProjects(getStoredProjects());
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   const handleUpdateModel = (modelId: string) => {

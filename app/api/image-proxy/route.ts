@@ -15,6 +15,17 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Missing url parameter", { status: 400 });
   }
 
+  // SSRF Protection: Only allow trusted image sources
+  try {
+    const parsed = new URL(imageUrl);
+    const allowedHosts = ["upload.wikimedia.org", "en.wikipedia.org", "commons.wikimedia.org"];
+    if (!allowedHosts.some((h) => parsed.hostname.endsWith(h))) {
+      return new NextResponse("Blocked: untrusted image source", { status: 403 });
+    }
+  } catch {
+    return new NextResponse("Invalid URL", { status: 400 });
+  }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
