@@ -150,15 +150,11 @@ export async function POST(req: NextRequest) {
     const lastUserMessage = (messages[messages.length - 1]?.content || "").trim();
 
     // 2. Autonomous Dynamic Auto-Routing
-    let targetModel = "meta/llama-3.1-70b-instruct";
+    let targetModel = "openai/gpt-oss-20b";
     if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
       targetModel = "meta/muse-glimmer-30b";
-    } else if (/^(hello|hi|hey|good\s+morning|who\s+are\s+you|thanks|thank\s+you)\b/i.test(lastUserMessage.toLowerCase().trim())) {
-      // Lightning 8B for instant conversational greetings
-      targetModel = "meta/llama-3.1-8b-instruct";
     } else {
-      // Flagship 70B for all technical definitions, science, algorithms, world knowledge & code
-      targetModel = "meta/llama-3.1-70b-instruct";
+      targetModel = "openai/gpt-oss-20b";
     }
 
     // 3. In-Memory LRU Cache Hit (Pillar 3: Add Caching, < 2ms instant response)
@@ -268,19 +264,19 @@ export async function POST(req: NextRequest) {
             activeApiKey,
             (chunk) => controller.enqueue(chunk),
             (delta) => (collectedFullResponse += delta),
-            targetModel === "meta/llama-3.1-8b-instruct" ? 12000 : 15000
+            15000
           );
         } catch (primaryErr: any) {
-          // Automatic Self-Healing Fallback to 8B on error or queue timeout
-          if (targetModel !== "meta/llama-3.1-8b-instruct" && !attachment) {
+          // Automatic Fallback to secondary model on timeout/error
+          if (targetModel !== "openai/gpt-oss-20b" && !attachment) {
             try {
               await streamFromNvidia(
-                "meta/llama-3.1-8b-instruct",
+                "openai/gpt-oss-20b",
                 formattedMessages,
                 activeApiKey,
                 (chunk) => controller.enqueue(chunk),
                 (delta) => (collectedFullResponse += delta),
-                12000
+                15000
               );
             } catch (fallbackErr: any) {
               controller.enqueue(

@@ -2,19 +2,11 @@ import { NvidiaModel } from "./types";
 
 export const LOT_MODELS: NvidiaModel[] = [
   {
-    id: "meta/llama-3.1-70b-instruct",
-    name: "LOT Flagship 70B",
+    id: "openai/gpt-oss-20b",
+    name: "LOT Sovereign 20B",
     provider: "LOT AI",
-    description: "Flagship intelligence for deep reasoning, accurate factual knowledge, and full-stack software synthesis.",
+    description: "Ultra-fast, high-precision intelligence powered by NVIDIA H100 inference.",
     badge: "Flagship",
-    contextWindow: "128k",
-  },
-  {
-    id: "meta/llama-3.1-8b-instruct",
-    name: "LOT Ultra-Speed (Lightning)",
-    provider: "LOT AI",
-    description: "Sub-150ms instant response engine powered by NVIDIA H100 inference.",
-    badge: "Fastest",
     contextWindow: "128k",
   },
   {
@@ -27,7 +19,7 @@ export const LOT_MODELS: NvidiaModel[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "meta/llama-3.1-70b-instruct";
+export const DEFAULT_MODEL_ID = "openai/gpt-oss-20b";
 
 /**
  * LOT AI Sovereign System Prompt v3
