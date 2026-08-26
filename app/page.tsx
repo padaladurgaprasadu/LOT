@@ -95,10 +95,9 @@ export default function Home() {
 
     const loadedConversations = getStoredConversations();
     setConversations(loadedConversations);
-    const loadedConvId = getStoredCurrentConvId();
-    if (loadedConvId && loadedConversations.some((c) => c.id === loadedConvId)) {
-      setActiveConvId(loadedConvId);
-    }
+    // On fresh app launch/opening, always start on a clean new chat session automatically
+    setActiveConvId(null);
+    setStoredCurrentConvId(null);
     setTasks(getStoredTasks());
     setProjects(getStoredProjects());
 
