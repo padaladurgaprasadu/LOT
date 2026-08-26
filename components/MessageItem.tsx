@@ -63,11 +63,10 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   formatted = formatted.replace(/^\s*={3,}\s*$/gm, "");
   formatted = formatted.replace(/^\s*-{3,}\s*$/gm, "");
 
-  // 5. Expand inline bold section headers that appear mid-paragraph
-  //    e.g. "...end of sentence. **Section Title** Next paragraph..."
+  // 5. Expand standalone bold section labels (e.g. "**Key Highlights:**" followed by newline)
   formatted = formatted.replace(
-    /([.!?])\s+\*\*([A-Z][^\n*]{2,60}?)\*\*\s+(?=[A-Z0-9])/g,
-    "$1\n\n### $2\n\n"
+    /(?:^|\n)\*\*([A-Z][^\n*]{2,50}:?)\*\*\s*\n/g,
+    "\n\n### $1\n\n"
   );
 
   // 6. Ensure blank line before any heading (if not at very start)
