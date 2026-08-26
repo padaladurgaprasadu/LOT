@@ -31,6 +31,14 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   if (!content) return "";
   let formatted = content;
 
+  // 0. Strip opening echo heading — model sometimes starts with a heading that just
+  //    echoes or summarizes the user's question (e.g. "## Greeting", "## What is RAG?",
+  //    "## Answer", "## Response"). Remove it so the answer starts with real content.
+  formatted = formatted.replace(
+    /^\s*#{1,6}\s+(greeting|hello|hi|hey|answer|response|result|output|overview|introduction|summary|question|query|reply)\s*\n*/i,
+    ""
+  );
+
   // 1. Expand inline headings that appear on the same line after sentence punctuation
   //    e.g. "...in a program. ### Types of Loops" -> "...in a program.\n\n### Types of Loops\n\n"
   formatted = formatted.replace(
