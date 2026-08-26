@@ -344,7 +344,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    placeholder="e.g. Durga prasadu"
+                    placeholder="e.g. John"
                     className="w-full bg-[#141416] text-white text-xs px-3.5 py-2.5 rounded-xl border border-zinc-800 focus:border-zinc-500 focus:outline-none transition-colors"
                   />
                 </div>
