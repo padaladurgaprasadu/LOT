@@ -31,11 +31,12 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   if (!content) return "";
   let formatted = content;
 
-  // 0. Strip opening echo heading — model sometimes starts with a heading that just
-  //    echoes or summarizes the user's question (e.g. "## Greeting", "## What is RAG?",
-  //    "## Answer", "## Response"). Remove it so the answer starts with real content.
+  // 0. Strip opening echo heading — model sometimes starts with a heading that is
+  //    EXACTLY a generic word like "## Greeting", "## Answer", "## Response".
+  //    Only removes when the heading text is exclusively one of these words (nothing else).
+  //    Never strips real content headings like "## City of Tirupati" or "## History of RAG".
   formatted = formatted.replace(
-    /^\s*#{1,6}\s+(greeting|hello|hi|hey|answer|response|result|output|overview|introduction|summary|question|query|reply)\s*\n*/i,
+    /^\s*#{1,6}\s+(greeting|hello|hi|hey|answer|response|result|output|introduction|summary|question|query|reply)\s*$/im,
     ""
   );
 
