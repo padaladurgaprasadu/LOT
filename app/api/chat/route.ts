@@ -35,7 +35,7 @@ async function streamFromNvidia(
     const postData = JSON.stringify({
       model,
       messages,
-      temperature: 0.55,
+      temperature: 0.6,
       top_p: 0.9,
       max_tokens: 4096,
       stream: true,
@@ -268,7 +268,7 @@ export async function POST(req: NextRequest) {
             activeApiKey,
             (chunk) => controller.enqueue(chunk),
             (delta) => (collectedFullResponse += delta),
-            targetModel === "meta/llama-3.1-8b-instruct" ? 8000 : 4500
+            targetModel === "meta/llama-3.1-8b-instruct" ? 12000 : 15000
           );
         } catch (primaryErr: any) {
           // Automatic Self-Healing Fallback to 8B on error or queue timeout
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
                 activeApiKey,
                 (chunk) => controller.enqueue(chunk),
                 (delta) => (collectedFullResponse += delta),
-                8000
+                12000
               );
             } catch (fallbackErr: any) {
               controller.enqueue(
