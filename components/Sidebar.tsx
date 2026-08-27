@@ -265,10 +265,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-xs font-medium text-zinc-200 truncate">
-                  {userProfile.name || "John"}
+                  {userProfile.isLoggedIn ? (userProfile.name || "User") : (userProfile.name || "Guest User")}
                 </span>
-                <span className="text-[10px] text-zinc-500 truncate">
-                  {userProfile.isLoggedIn ? userProfile.email : "Sign in / Sign up"}
+                <span className="text-[10px] text-blue-400 font-medium truncate">
+                  {userProfile.isLoggedIn ? userProfile.email : "24h Free Preview • Sign In"}
                 </span>
               </div>
             </div>

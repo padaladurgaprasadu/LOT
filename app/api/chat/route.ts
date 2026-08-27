@@ -127,14 +127,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Token Verification
+    // 1. Token Verification (Logged In vs. 24-Hour Free Guest Trial)
     const token = req.cookies.get("lot_session_token")?.value;
     const session = token ? verifyJwt(token) : null;
+    let guestCookieToSet: string | null = null;
+
     if (!session) {
-      return NextResponse.json(
-        { error: "Authentication required. Please sign in or create an account to use LOT AI." },
-        { status: 401 }
-      );
+      const guestCookie = req.cookies.get("lot_guest_session_start")?.value;
+      const now = Date.now();
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+      if (!guestCookie) {
+        // First-time guest: initialize 24-hour trial
+        guestCookieToSet = String(now);
+      } else {
+        const guestStartTime = parseInt(guestCookie, 10);
+        if (isNaN(guestStartTime) || now - guestStartTime > TWENTY_FOUR_HOURS) {
+          return NextResponse.json(
+            { error: "Your 24-hour free guest preview has expired. Please sign in or create a free account to continue." },
+            { status: 401 }
+          );
+        }
+      }
     }
 
     const { messages, customPrompt, attachment } = await req.json();
@@ -180,15 +194,20 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        const cachedHeaders: Record<string, string> = {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+          "X-LOT-Cache": "HIT",
+          "X-Response-Time": `${Date.now() - reqStart}ms`,
+        };
+        if (guestCookieToSet) {
+          cachedHeaders["Set-Cookie"] = `lot_guest_session_start=${guestCookieToSet}; Path=/; Max-Age=${24 * 60 * 60}; SameSite=Lax; HttpOnly`;
+        }
+
         return new Response(cachedStream, {
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-            "X-LOT-Cache": "HIT",
-            "X-Response-Time": `${Date.now() - reqStart}ms`,
-          },
+          headers: cachedHeaders,
         });
       }
     }
@@ -302,15 +321,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const streamHeaders: Record<string, string> = {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+      "X-LOT-Model": targetModel,
+      "X-LOT-Cache": "MISS",
+    };
+    if (guestCookieToSet) {
+      streamHeaders["Set-Cookie"] = `lot_guest_session_start=${guestCookieToSet}; Path=/; Max-Age=${24 * 60 * 60}; SameSite=Lax; HttpOnly`;
+    }
+
     return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-        "X-LOT-Model": targetModel,
-        "X-LOT-Cache": "MISS",
-      },
+      headers: streamHeaders,
     });
   } catch (err: any) {
     return NextResponse.json(

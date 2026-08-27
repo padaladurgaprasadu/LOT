@@ -79,18 +79,19 @@ export default function Home() {
           setUserProfile(profile);
           setStoredUserProfile(profile);
         } else {
-          // New or unauthenticated visitor: prompt login
-          const guest: UserProfile = { id: "guest", name: "", email: "", isLoggedIn: false };
+          // Unauthenticated visitor: start in 24-Hour Free Guest Mode (no intrusive popup)
+          const guest: UserProfile = { id: "guest", name: "Guest User", email: "", isLoggedIn: false };
           setUserProfile(guest);
           setStoredUserProfile(guest);
-          setAuthOpen(true);
+          setAuthOpen(false);
         }
       })
       .catch(() => {
         if (!isMounted) return;
-        const guest: UserProfile = { id: "guest", name: "", email: "", isLoggedIn: false };
+        const guest: UserProfile = { id: "guest", name: "Guest User", email: "", isLoggedIn: false };
         setUserProfile(guest);
-        setAuthOpen(true);
+        setStoredUserProfile(guest);
+        setAuthOpen(false);
       });
 
     const loadedConversations = getStoredConversations();
