@@ -8,6 +8,7 @@ import { resolveEntityHero } from "@/lib/entityHero";
 import { globalResponseCache } from "@/lib/responseCache";
 import { analyzeQuery } from "@/lib/queryRouter";
 import { performLiveWebSearch, requiresWebSearch } from "@/lib/webSearch";
+import { streamFromGroq } from "@/lib/groq";
 
 // 1. Enforce IPv4-first to eliminate DNS/NAT64 handshake latency
 dns.setDefaultResultOrder("ipv4first");
@@ -283,10 +284,26 @@ export async function POST(req: NextRequest) {
             activeApiKey,
             (chunk) => controller.enqueue(chunk),
             (delta) => (collectedFullResponse += delta),
-            15000
+            12000
           );
         } catch (primaryErr: any) {
-          // Automatic Fallback to secondary high-speed model on timeout/error
+          // 1. First Fallback: Ultra-fast Groq LPU if GROQ_API_KEY is configured
+          const groqKey = process.env.GROQ_API_KEY;
+          if (groqKey && !attachment) {
+            try {
+              await streamFromGroq(
+                "llama-3.3-70b-versatile",
+                formattedMessages,
+                groqKey,
+                (chunk) => controller.enqueue(chunk),
+                (delta) => (collectedFullResponse += delta),
+                8000
+              );
+              return;
+            } catch {}
+          }
+
+          // 2. Second Fallback: Secondary NVIDIA model
           if (targetModel !== "meta/llama-3.2-11b-vision-instruct" && !attachment) {
             try {
               await streamFromNvidia(

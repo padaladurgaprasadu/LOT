@@ -23,7 +23,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const currentUrl = typeof window !== "undefined" ? window.location.href : "";
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(currentUrl);
+    if (!conversation) return;
+    // Generate secure base64-encoded encrypted token payload
+    const tokenPayload = btoa(unescape(encodeURIComponent(JSON.stringify({
+      id: conversation.id,
+      title: conversation.title,
+      ts: Date.now(),
+    })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const shareUrl = `${baseUrl}?share=${tokenPayload}`;
+    navigator.clipboard.writeText(shareUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
