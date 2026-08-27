@@ -30,6 +30,7 @@ import {
 } from "../lib/storage";
 import { Conversation, Message, Project, ScheduledTask, UserProfile, Attachment, EntityHeroData } from "../lib/types";
 import { DEFAULT_MODEL_ID, LOT_SYSTEM_PROMPT } from "../lib/nvidia";
+import { migrateGuestConversationsToUser, saveInputDraft, getInputDraft, clearInputDraft } from "../lib/session";
 
 export default function Home() {
   // Sidebar & Modals state
@@ -102,9 +103,20 @@ export default function Home() {
     setTasks(getStoredTasks());
     setProjects(getStoredProjects());
 
+    // Multi-Tab Real-Time Sync Listener
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "lot_conversations_v1" && e.newValue) {
+        try {
+          setConversations(JSON.parse(e.newValue));
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
     return () => {
       isMounted = false;
       controller.abort();
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
 
@@ -116,6 +128,14 @@ export default function Home() {
   const handleUpdateUserProfile = (profile: UserProfile) => {
     setUserProfile(profile);
     setStoredUserProfile(profile);
+    
+    // Auto-migrate guest conversations to authenticated user
+    if (profile.isLoggedIn && profile.id && profile.id !== "guest") {
+      const migrated = migrateGuestConversationsToUser(profile.id);
+      if (migrated > 0) {
+        setConversations(getStoredConversations());
+      }
+    }
   };
 
   const activeConversation = conversations.find((c) => c.id === activeConvId) || null;
