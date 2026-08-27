@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Message } from "@/lib/types";
 import { ThreeSceneRunner } from "./ThreeSceneRunner";
+import { DiffViewer } from "./DiffViewer";
 import { auditCodeSecurity, SecurityVulnerability } from "@/lib/security/strixSecurityAuditor";
 
 interface MessageItemProps {
@@ -365,6 +366,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
                 const codeText = String(children).replace(/\n$/, "");
                 const language = match ? match[1] : "code";
+
+                // Cursor-Style Interactive Diff Viewer
+                if (language === "diff" || language === "patch") {
+                  return <DiffViewer diffText={codeText} />;
+                }
+
                 const blockId = `code_${language}_${codeText.slice(0, 20).replace(/\s+/g, "_")}`;
                 const outputState = codeOutputs[blockId];
                 const auditState = securityAudits[blockId];
