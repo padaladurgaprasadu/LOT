@@ -334,6 +334,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   accept=".mp3,.wav,.m4a,.ogg,.webm"
                 />
               </label>
+              {/* Agentic Coding Modes (Cursor / Claude Code style) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setInput((prev) => `[Coder Mode]: Generate a clean Unified Diff patch to refactor and implement: \n${prev}`);
+                  setPlusMenuOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] text-left transition-colors"
+              >
+                <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Code Refactor & Diff</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInput((prev) => `[Debug & Self-Heal]: Diagnose the error, pinpoint the root cause, and output the fix:\n${prev}`);
+                  setPlusMenuOpen(false);
+                  textareaRef.current?.focus();
+                }}
+                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] text-left transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Debug & Self-Heal</span>
+              </button>
+
               {onOpenScheduleTasks && (
                 <button
                   onClick={() => {
