@@ -1,13 +1,12 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
-import { Check, Copy, FileCode, CheckCheck, X, Eye, FileDiff } from "lucide-react";
+import { Check, Copy, CheckCheck, FileDiff } from "lucide-react";
 
 interface DiffViewerProps {
   filePath?: string;
   diffText: string;
   onApply?: (filePath: string, newContent: string) => void;
-  onReject?: () => void;
 }
 
 interface DiffLine {
@@ -116,7 +115,11 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
           <button
             onClick={handleAccept}
             disabled={applied}
-            className={lex items-center space-x-1 px-3 py-1 rounded-lg transition-all font-medium }
+            className={
+              applied
+                ? "flex items-center space-x-1 px-3 py-1 rounded-lg transition-all font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                : "flex items-center space-x-1 px-3 py-1 rounded-lg transition-all font-medium bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 active:scale-95"
+            }
             title="Accept & apply changes"
           >
             {applied ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> : <Check className="w-3.5 h-3.5" />}
@@ -139,11 +142,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
           const isAdd = line.type === "add";
           const isDel = line.type === "del";
 
+          let lineClass = "flex items-stretch px-2 py-0.5 leading-relaxed font-mono text-zinc-300 hover:bg-zinc-900/40";
+          if (isAdd) {
+            lineClass = "flex items-stretch px-2 py-0.5 leading-relaxed font-mono bg-emerald-950/30 text-emerald-200 border-l-2 border-emerald-500";
+          } else if (isDel) {
+            lineClass = "flex items-stretch px-2 py-0.5 leading-relaxed font-mono bg-rose-950/30 text-rose-300 border-l-2 border-rose-500 line-through opacity-80";
+          }
+
           return (
-            <div
-              key={idx}
-              className={lex items-stretch px-2 py-0.5 leading-relaxed font-mono }
-            >
+            <div key={idx} className={lineClass}>
               <div className="w-10 text-right pr-2 text-zinc-600 select-none text-[10px] shrink-0 font-sans">
                 {line.oldLineNumber || ""}
               </div>
