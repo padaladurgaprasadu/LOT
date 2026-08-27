@@ -98,7 +98,7 @@ export async function performLiveWebSearch(query: string): Promise<string | null
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+    const timeout = setTimeout(() => controller.abort(), 1500);
 
     const [ddgResults, wikiResults] = await Promise.all([
       searchDuckDuckGo(cleanQuery, controller.signal),

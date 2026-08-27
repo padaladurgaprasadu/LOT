@@ -2,10 +2,10 @@ import { NvidiaModel } from "./types";
 
 export const LOT_MODELS: NvidiaModel[] = [
   {
-    id: "openai/gpt-oss-20b",
-    name: "LOT Sovereign 20B",
+    id: "nvidia/nemotron-3-nano-30b-a3b",
+    name: "LOT Nemotron Ultra-Speed 30B",
     provider: "LOT AI",
-    description: "Ultra-fast, high-precision intelligence powered by NVIDIA H100 inference.",
+    description: "Sub-450ms ultra-fast intelligence powered by NVIDIA H100 inference.",
     badge: "Flagship",
     contextWindow: "128k",
   },
@@ -19,7 +19,7 @@ export const LOT_MODELS: NvidiaModel[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "openai/gpt-oss-20b";
+export const DEFAULT_MODEL_ID = "nvidia/nemotron-3-nano-30b-a3b";
 
 /**
  * LOT AI Sovereign System Prompt v4

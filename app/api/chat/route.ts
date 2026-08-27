@@ -163,12 +163,12 @@ export async function POST(req: NextRequest) {
 
     const lastUserMessage = (messages[messages.length - 1]?.content || "").trim();
 
-    // 2. Autonomous Dynamic Auto-Routing
-    let targetModel = "openai/gpt-oss-20b";
+    // 2. Autonomous Dynamic Auto-Routing (Sub-450ms Ultra-Speed Model)
+    let targetModel = "nvidia/nemotron-3-nano-30b-a3b";
     if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
       targetModel = "meta/muse-glimmer-30b";
     } else {
-      targetModel = "openai/gpt-oss-20b";
+      targetModel = "nvidia/nemotron-3-nano-30b-a3b";
     }
 
     // 3. In-Memory LRU Cache Hit (Pillar 3: Add Caching, < 2ms instant response)
@@ -286,16 +286,16 @@ export async function POST(req: NextRequest) {
             15000
           );
         } catch (primaryErr: any) {
-          // Automatic Fallback to secondary model on timeout/error
-          if (targetModel !== "openai/gpt-oss-20b" && !attachment) {
+          // Automatic Fallback to secondary high-speed model on timeout/error
+          if (targetModel !== "meta/llama-3.2-11b-vision-instruct" && !attachment) {
             try {
               await streamFromNvidia(
-                "openai/gpt-oss-20b",
+                "meta/llama-3.2-11b-vision-instruct",
                 formattedMessages,
                 activeApiKey,
                 (chunk) => controller.enqueue(chunk),
                 (delta) => (collectedFullResponse += delta),
-                15000
+                8000
               );
             } catch (fallbackErr: any) {
               controller.enqueue(
