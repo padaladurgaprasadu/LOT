@@ -16,6 +16,7 @@ import {
   X,
   ShieldAlert,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 import { Message } from "@/lib/types";
 import { ThreeSceneRunner } from "./ThreeSceneRunner";
