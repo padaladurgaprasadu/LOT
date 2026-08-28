@@ -13,6 +13,7 @@ import { SettingsModal } from "../components/SettingsModal";
 import { ShareModal } from "../components/ShareModal";
 import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
+import { ImageStudioModal } from "../components/ImageStudioModal";
 import {
   DEFAULT_USER,
   getStoredModel,
@@ -42,6 +43,9 @@ export default function Home() {
   const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [imageStudioOpen, setImageStudioOpen] = useState(false);
+  const [studioImage, setStudioImage] = useState<string>("");
+  const [studioPrompt, setStudioPrompt] = useState<string>("");
 
   // App data state - Default to unauthenticated guest
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
@@ -610,6 +614,11 @@ export default function Home() {
             isLoading={isLoading}
             onStopGeneration={handleStopGeneration}
             onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
+            onOpenImageStudio={() => {
+              setStudioImage("");
+              setStudioPrompt("");
+              setImageStudioOpen(true);
+            }}
             externalInput={inputDraft}
           />
         </div>
@@ -665,6 +674,13 @@ export default function Home() {
         isOpen={shareOpen}
         onClose={() => setShareOpen(false)}
         conversation={activeConversation}
+      />
+
+      <ImageStudioModal
+        isOpen={imageStudioOpen}
+        onClose={() => setImageStudioOpen(false)}
+        initialImageUrl={studioImage}
+        initialPrompt={studioPrompt}
       />
     </div>
   );
