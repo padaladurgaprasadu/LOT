@@ -9,6 +9,7 @@ interface ChatInputProps {
   isLoading: boolean;
   onStopGeneration?: () => void;
   onOpenScheduleTasks?: () => void;
+  onOpenLotCode?: () => void;
   externalInput?: string;
 }
 
@@ -17,6 +18,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isLoading,
   onStopGeneration,
   onOpenScheduleTasks,
+  onOpenLotCode,
   externalInput,
 }) => {
   const [input, setInput] = useState("");
@@ -360,6 +362,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span>Debug & Self-Heal</span>
               </button>
+
+              {onOpenLotCode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenLotCode();
+                    setPlusMenuOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-blue-400 hover:bg-[#1c1c21] text-left transition-colors font-medium"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <span>LOT CODE Agent (⚡ Ox-Alpha)</span>
+                </button>
+              )}
 
               {onOpenScheduleTasks && (
                 <button

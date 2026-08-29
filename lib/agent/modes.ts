@@ -3,7 +3,7 @@
  * Inspired by Claude Code & OpenCode architecture
  */
 
-export type LotAgentMode = "plan" | "act" | "audit" | "auto";
+export type LotAgentMode = "plan" | "act" | "audit" | "auto" | "ox-alpha";
 
 export interface AgentModeConfig {
   mode: LotAgentMode;
@@ -43,6 +43,14 @@ export const LOT_MODES: Record<LotAgentMode, AgentModeConfig> = {
     mode: "auto",
     name: "Unattended CI/CD Mode",
     description: "Fully automated pipeline for GitHub Actions, unattended PR resolution, and scheduled refactoring.",
+    allowFileWrite: true,
+    allowCommandExecution: true,
+    enforceSecurityReview: true,
+  },
+  "ox-alpha": {
+    mode: "ox-alpha",
+    name: "Ox-Alpha 1M Reasoning Coder",
+    description: "Deep multi-file reasoning, 1M context repository ingestion, and SWE-bench autonomous diff synthesis.",
     allowFileWrite: true,
     allowCommandExecution: true,
     enforceSecurityReview: true,

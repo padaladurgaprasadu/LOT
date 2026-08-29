@@ -13,6 +13,7 @@ import { SettingsModal } from "../components/SettingsModal";
 import { ShareModal } from "../components/ShareModal";
 import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
+import { LotCodeModal } from "../components/LotCodeModal";
 import {
   DEFAULT_USER,
   getStoredModel,
@@ -42,6 +43,7 @@ export default function Home() {
   const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [lotCodeOpen, setLotCodeOpen] = useState(false);
 
   // App data state - Default to unauthenticated guest
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
@@ -579,6 +581,7 @@ export default function Home() {
         <Header
           isSidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onOpenLotCode={() => setLotCodeOpen(true)}
         />
 
         {/* Chat / Hero Body */}
@@ -610,12 +613,17 @@ export default function Home() {
             isLoading={isLoading}
             onStopGeneration={handleStopGeneration}
             onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
+            onOpenLotCode={() => setLotCodeOpen(true)}
             externalInput={inputDraft}
           />
         </div>
       </div>
 
       {/* Modals */}
+      <LotCodeModal
+        isOpen={lotCodeOpen}
+        onClose={() => setLotCodeOpen(false)}
+      />
       <SkillsMarketplaceModal
         isOpen={skillsMarketplaceOpen}
         onClose={() => setSkillsMarketplaceOpen(false)}
