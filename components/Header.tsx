@@ -45,10 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
         {onOpenLotCode && (
           <button
             onClick={onOpenLotCode}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/25 transition-all text-xs font-semibold shadow-sm hover:scale-105 active:scale-95"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-800 transition-all text-xs font-medium active:scale-95"
             title="Open LOT CODE Agent Studio"
           >
-            <span className="text-[11px]">⚡</span>
             <span>LOT CODE</span>
           </button>
         )}

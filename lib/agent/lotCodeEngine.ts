@@ -81,7 +81,7 @@ export class LotCodeEngine {
       message: `Formulating multi-file architectural execution plan. Ensuring zero placeholders and typed interfaces.`,
     });
 
-    // Step 3: Parse Target Action (Plan vs Act vs Audit vs Ox-Alpha)
+    // Step 3: Parse Target Action (Plan vs Act vs Audit)
     if (config.mode === "plan") {
       emit({
         type: "thought",
@@ -101,7 +101,7 @@ export class LotCodeEngine {
       };
     }
 
-    // Step 4: Diff Synthesis (Ox-Alpha / Act / Auto)
+    // Step 4: Diff Synthesis (Act / Auto)
     const targetFile = config.targetFiles?.[0] || fileList[0] || "src/index.ts";
 
     emit({

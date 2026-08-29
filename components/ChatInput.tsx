@@ -316,8 +316,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           {/* Plus Menu Popover */}
           {plusMenuOpen && (
             <div className="absolute bottom-12 left-0 w-48 sm:w-52 bg-[#141418] border border-[#27272a] rounded-2xl shadow-2xl py-1.5 z-50 animate-in fade-in duration-100">
-              <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] cursor-pointer transition-colors">
-                <Paperclip className="w-3.5 h-3.5 text-zinc-400" />
+              <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
+                <Paperclip className="w-3.5 h-3.5 text-zinc-300" />
                 <span>Upload File / Image</span>
                 <input
                   type="file"
@@ -326,8 +326,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.js,.ts,.tsx,.jsx,.py,.html,.css,.json,.md,.mp3,.wav,.m4a,.ogg,.webm"
                 />
               </label>
-              <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] cursor-pointer transition-colors">
-                <Music className="w-3.5 h-3.5 text-blue-400" />
+              <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
+                <Music className="w-3.5 h-3.5 text-zinc-300" />
                 <span>Whisper Audio Transcribe</span>
                 <input
                   type="file"
@@ -344,9 +344,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   setPlusMenuOpen(false);
                   textareaRef.current?.focus();
                 }}
-                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
               >
-                <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+                <FileCode className="w-3.5 h-3.5 text-zinc-300" />
                 <span>Code Refactor & Diff</span>
               </button>
 
@@ -357,9 +357,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   setPlusMenuOpen(false);
                   textareaRef.current?.focus();
                 }}
-                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
                 <span>Debug & Self-Heal</span>
               </button>
 
@@ -370,10 +370,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     onOpenLotCode();
                     setPlusMenuOpen(false);
                   }}
-                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-blue-400 hover:bg-[#1c1c21] text-left transition-colors font-medium"
+                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  <span>LOT CODE Agent (⚡ Ox-Alpha)</span>
+                  <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+                  <span>LOT CODE Agent</span>
                 </button>
               )}
 
@@ -383,9 +383,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     onOpenScheduleTasks();
                     setPlusMenuOpen(false);
                   }}
-                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] text-left transition-colors"
+                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
                   <span>Schedule Task</span>
                 </button>
               )}

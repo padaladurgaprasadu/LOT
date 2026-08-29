@@ -42,7 +42,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
   initialPrompt = "",
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
-  const [mode, setMode] = useState<LotAgentMode>("ox-alpha");
+  const [mode, setMode] = useState<LotAgentMode>("act");
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [generatedDiffs, setGeneratedDiffs] = useState<Array<{ filePath: string; diff: string }>>([]);
@@ -155,13 +155,13 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
         {/* Top Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-[#121216] border-b border-zinc-800">
           <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <div className="p-2 rounded-xl bg-zinc-800 border border-zinc-700 text-white">
               <Cpu className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-white text-base tracking-tight">LOT CODE</span>
-                <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
                   Native Agent
                 </span>
               </div>
@@ -171,7 +171,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
 
           {/* Mode Selector */}
           <div className="flex items-center space-x-1.5 p-1 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs">
-            {(["ox-alpha", "act", "plan", "audit"] as LotAgentMode[]).map((m) => {
+            {(["act", "plan", "audit"] as LotAgentMode[]).map((m) => {
               const active = mode === m;
               return (
                 <button
@@ -180,14 +180,13 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
                   disabled={isRunning}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                     active
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                      ? "bg-zinc-800 text-white border border-zinc-700"
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                   }`}
                 >
-                  {m === "ox-alpha" && "⚡ Ox-Alpha 1M"}
-                  {m === "act" && "🛠️ Act"}
-                  {m === "plan" && "📋 Plan"}
-                  {m === "audit" && "🛡️ Audit"}
+                  {m === "act" && "Act"}
+                  {m === "plan" && "Plan"}
+                  {m === "audit" && "Audit"}
                 </button>
               );
             })}
@@ -217,7 +216,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
                   key={filePath}
                   className="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-colors cursor-pointer"
                 >
-                  <FileCode className="w-4 h-4 text-blue-400 shrink-0" />
+                  <FileCode className="w-4 h-4 text-zinc-400 shrink-0" />
                   <span className="truncate">{filePath}</span>
                 </div>
               ))}
@@ -241,11 +240,11 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
                 placeholder="E.g., Refactor authentication module to support OAuth2 tokens and rate limiting..."
                 rows={3}
                 disabled={isRunning}
-                className="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700/80 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500 resize-none"
+                className="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700/80 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 resize-none"
               />
               <div className="mt-2.5 flex items-center justify-between">
                 <span className="text-[11px] text-zinc-500">
-                  {mode === "ox-alpha" ? "1M Context DeepSWE reasoning enabled" : "Zero-placeholder patch synthesis"}
+                  Zero-placeholder patch synthesis
                 </span>
                 <button
                   onClick={handleRunAgent}
@@ -253,7 +252,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
                   className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                     isRunning
                       ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25 active:scale-95"
+                      : "bg-white hover:bg-zinc-200 text-black active:scale-95"
                   }`}
                 >
                   {isRunning ? (
