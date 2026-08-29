@@ -16,7 +16,6 @@ import {
   X,
   ShieldAlert,
   ShieldCheck,
-  Download,
 } from "lucide-react";
 import { Message } from "@/lib/types";
 import { ThreeSceneRunner } from "./ThreeSceneRunner";
@@ -264,40 +263,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              img({ node, src, alt, ...props }) {
-                if (!src) return null;
-                return (
-                  <div className="my-4 w-full max-w-lg rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl group relative">
-                    <div className="relative overflow-hidden bg-zinc-950 flex items-center justify-center">
-                      <img
-                        src={src}
-                        alt={alt || "LOT Generated Artwork"}
-                        className="w-full max-h-96 object-contain rounded-t-2xl transition-transform duration-300 group-hover:scale-[1.02]"
-                        loading="lazy"
-                        {...props}
-                      />
-                    </div>
-                    {/* Image Footer Action Bar */}
-                    <div className="p-3 bg-zinc-900/60 border-t border-zinc-800 flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-semibold text-zinc-300 truncate max-w-[200px]">{alt || "AI Generated Artwork"}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <a
-                          href={src}
-                          download="lot-ai-generated.png"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2.5 py-1 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition flex items-center space-x-1"
-                        >
-                          <Download className="w-3 h-3" />
-                          <span>Save</span>
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                );
-              },
               blockquote({ node, children, ...props }) {
                 return (
                   <blockquote

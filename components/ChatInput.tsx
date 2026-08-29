@@ -9,7 +9,6 @@ interface ChatInputProps {
   isLoading: boolean;
   onStopGeneration?: () => void;
   onOpenScheduleTasks?: () => void;
-  onOpenImageStudio?: () => void;
   externalInput?: string;
 }
 
@@ -18,7 +17,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isLoading,
   onStopGeneration,
   onOpenScheduleTasks,
-  onOpenImageStudio,
   externalInput,
 }) => {
   const [input, setInput] = useState("");
@@ -336,21 +334,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   accept=".mp3,.wav,.m4a,.ogg,.webm"
                 />
               </label>
-              {/* Image Generation & Photoshoot Studio */}
-              {onOpenImageStudio && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenImageStudio();
-                    setPlusMenuOpen(false);
-                  }}
-                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:bg-[#1c1c21] text-left transition-colors"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Image Studio & Photoshoot</span>
-                </button>
-              )}
-
               {/* Agentic Coding Modes (Cursor / Claude Code style) */}
               <button
                 type="button"
