@@ -7,7 +7,17 @@ export function requiresWebSearch(query: string): boolean {
   const lower = query.toLowerCase().trim();
 
   // Skip pure greetings
-  if (/^(hello|hi|hey|good\s+morning|who\s+are\s+you|thanks|thank\s+you)[\s!?.]*$/i.test(lower)) return false;
+  if (/^(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening|who\s+are\s+you|thanks|thank\s+you)[\s!?.]*$/i.test(lower)) return false;
+
+  // Skip pure date/time queries — server clock is 100% authoritative ground truth
+  if (
+    /^(what('?s| is)?\s+)?(today('?s)?\s+date|current\s+(date|time|year|month|day)|date\s+today|what\s+day\s+is\s+(it|today)|time\s+now|today\s+date|what\s+is\s+today|current\s+day|today's\s+day|what\s+is\s+the\s+date)[\s!?.]*$/i.test(
+      lower
+    ) ||
+    /^(today\s+date|todays\s+date|date\s+today|today|current\s+date)[\s!?.]*$/i.test(lower)
+  ) {
+    return false;
+  }
 
   // Skip pure code-writing requests (model knows these from training)
   if (/^(write\s+a\s+(function|class|script|program)|implement\s+a\s+binary\s+tree|regex\s+for|sql\s+query\s+to|create\s+a\s+react\s+component)\b/i.test(lower)) return false;

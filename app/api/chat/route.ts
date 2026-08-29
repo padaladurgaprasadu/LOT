@@ -221,8 +221,20 @@ export async function POST(req: NextRequest) {
       requiresWebSearch(lastUserMessage) ? performLiveWebSearch(lastUserMessage) : Promise.resolve(null),
     ]);
 
-    // 5. Build Formatted Context
+    // 5. Build Formatted Context with Authoritative Temporal Ground Truth
+    const now = new Date();
+    const currentDateFormatted = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "Asia/Kolkata",
+    });
+    const currentUtcString = now.toUTCString();
+
     let baseSystemPrompt = customPrompt || LOT_SYSTEM_PROMPT;
+    baseSystemPrompt += `\n\n[AUTHORITATIVE SERVER CLOCK & TEMPORAL CONTEXT]:\nToday's Date: ${currentDateFormatted} (UTC: ${currentUtcString})\nCurrent Year: ${now.getFullYear()}\nCRITICAL RULE: When asked for today's date, day, month, year, or current time, ALWAYS answer with this exact date (${currentDateFormatted}). Never hallucinate a past or future date.`;
+
     if (analysis.intent === "code_synthesis") {
       baseSystemPrompt += `\n\n${AGENTIC_CODING_SYSTEM_DIRECTIVES}`;
     }
