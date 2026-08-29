@@ -9,6 +9,7 @@ import { globalResponseCache } from "@/lib/responseCache";
 import { analyzeQuery } from "@/lib/queryRouter";
 import { performLiveWebSearch, requiresWebSearch } from "@/lib/webSearch";
 import { streamFromGroq } from "@/lib/groq";
+import { AGENTIC_CODING_SYSTEM_DIRECTIVES } from "@/lib/agent/codingDirectives";
 
 // 1. Enforce IPv4-first to eliminate DNS/NAT64 handshake latency
 dns.setDefaultResultOrder("ipv4first");
@@ -222,6 +223,9 @@ export async function POST(req: NextRequest) {
 
     // 5. Build Formatted Context
     let baseSystemPrompt = customPrompt || LOT_SYSTEM_PROMPT;
+    if (analysis.intent === "code_synthesis") {
+      baseSystemPrompt += `\n\n${AGENTIC_CODING_SYSTEM_DIRECTIVES}`;
+    }
     if (webGrounding) {
       baseSystemPrompt += `\n\n[VERIFIED REAL-TIME SEARCH RESULTS & LIVE INTERNET GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. You have active real-time web access. Use the above verified live search data as your absolute ground truth. NEVER state you have a knowledge cutoff or lack recent data. Answer directly with the latest facts.`;
     }

@@ -581,7 +581,6 @@ export default function Home() {
         <Header
           isSidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          onOpenLotCode={() => setLotCodeOpen(true)}
         />
 
         {/* Chat / Hero Body */}

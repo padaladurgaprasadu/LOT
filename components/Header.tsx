@@ -6,13 +6,11 @@ import { PanelLeft } from "lucide-react";
 interface HeaderProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
-  onOpenLotCode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   isSidebarOpen,
   onToggleSidebar,
-  onOpenLotCode,
 }) => {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between w-full px-4 sm:px-6 py-3.5 bg-black min-h-[60px]">
@@ -40,18 +38,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right side: LOT Code Launcher */}
-      <div className="flex items-center space-x-2.5">
-        {onOpenLotCode && (
-          <button
-            onClick={onOpenLotCode}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-800 transition-all text-xs font-medium active:scale-95"
-            title="Open LOT CODE Agent Studio"
-          >
-            <span>LOT CODE</span>
-          </button>
-        )}
-      </div>
+      {/* Right side */}
+      <div />
     </header>
   );
 };
