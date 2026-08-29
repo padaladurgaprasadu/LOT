@@ -71,11 +71,26 @@ export function analyzeQuery(query: string, hasAttachment: boolean): QueryAnalys
     };
   }
 
-  // 5. Default Fast Direct Path (Zero Tool Bloat / Sub-100ms Instant Answer)
+  // 5. Translation & Multilingual Intent (Fast Direct Translation)
+  if (
+    /\b(translate|translation|how\s+to\s+say|how\s+do\s+you\s+say|meaning\s+in|in\s+(telugu|hindi|tamil|kannada|malayalam|marathi|bengali|gujarati|punjabi|odia|urdu|spanish|french|german|italian|portuguese|russian|japanese|chinese|mandarin|korean|arabic|dutch|turkish))\b/i.test(
+      lower
+    )
+  ) {
+    return {
+      intent: "direct_fast",
+      requiresHero: false,
+      modelTier: "fast",
+    };
+  }
+
+  // 6. Default Fast Direct Path (Zero Tool Bloat / Sub-100ms Instant Answer)
+  const isGenericEntity = clean.length <= 35 && /^[A-Z][a-zA-Z\s]+$/.test(clean) && !/\b(how|why|what|when|where|who|translate|write|code|create|explain|can\s+you)\b/i.test(clean);
+
   return {
     intent: "direct_fast",
     targetEntity: clean,
-    requiresHero: clean.length <= 40 && !clean.includes("how to") && !clean.includes("why is"),
+    requiresHero: isGenericEntity,
     modelTier: "fast",
   };
 }

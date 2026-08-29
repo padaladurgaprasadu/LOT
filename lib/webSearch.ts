@@ -19,6 +19,16 @@ export function requiresWebSearch(query: string): boolean {
     return false;
   }
 
+  // Skip pure translation & language conversion requests (model handles natively with zero search pollution)
+  if (
+    /\b(translate|translation|how\s+to\s+say|how\s+do\s+you\s+say|meaning\s+in|in\s+(telugu|hindi|tamil|kannada|malayalam|marathi|bengali|gujarati|punjabi|odia|urdu|spanish|french|german|italian|portuguese|russian|japanese|chinese|mandarin|korean|arabic|dutch|turkish))\b/i.test(
+      lower
+    ) ||
+    /^(translate\s+to|translate\s+into|translate\s+from|how\s+to\s+write)\b/i.test(lower)
+  ) {
+    return false;
+  }
+
   // Skip pure code-writing requests (model knows these from training)
   if (/^(write\s+a\s+(function|class|script|program)|implement\s+a\s+binary\s+tree|regex\s+for|sql\s+query\s+to|create\s+a\s+react\s+component)\b/i.test(lower)) return false;
 
