@@ -88,7 +88,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
     });
 
     try {
-      const res = await fetch("/app/api/agent/lot-code", {
+      const res = await fetch("/api/agent/lot-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
