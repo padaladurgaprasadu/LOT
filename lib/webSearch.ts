@@ -112,16 +112,33 @@ async function searchWikipedia(query: string, signal: AbortSignal): Promise<stri
   }
 }
 
-export async function performLiveWebSearch(query: string): Promise<string | null> {
+import { IndustryFocus } from "./types";
+
+export async function performLiveWebSearch(query: string, focus: IndustryFocus = "all"): Promise<string | null> {
   const cleanQuery = query.trim();
   if (!cleanQuery) return null;
 
+  // Augment query based on selected vertical industry focus
+  let targetQuery = cleanQuery;
+  let focusTitle = "REAL-TIME LIVE WEB";
+
+  if (focus === "dev") {
+    targetQuery = `${cleanQuery} (documentation OR site:github.com OR site:stackoverflow.com OR site:developer.mozilla.org OR RFC)`;
+    focusTitle = "VERIFIED DEV & CODE SPECS";
+  } else if (focus === "hardware") {
+    targetQuery = `${cleanQuery} (datasheet OR microarchitecture OR site:ieee.org OR site:arxiv.org OR whitepaper OR silicon)`;
+    focusTitle = "VERIFIED HARDWARE & SILICON INTELLIGENCE";
+  } else if (focus === "news") {
+    targetQuery = `${cleanQuery} 2026 breaking news live updates`;
+    focusTitle = "VERIFIED LIVE 2026 NEWS & EVENT STREAM";
+  }
+
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
+    const timeout = setTimeout(() => controller.abort(), 2000);
 
     const [ddgResults, wikiResults] = await Promise.all([
-      searchDuckDuckGo(cleanQuery, controller.signal),
+      searchDuckDuckGo(targetQuery, controller.signal),
       searchWikipedia(cleanQuery, controller.signal),
     ]);
 
@@ -129,7 +146,7 @@ export async function performLiveWebSearch(query: string): Promise<string | null
 
     const combined = [...ddgResults, ...wikiResults];
     if (combined.length > 0) {
-      return `[VERIFIED REAL-TIME LIVE WEB RESULTS FOR: "${cleanQuery}"]:\n${combined.slice(0, 10).map((s, i) => `[Source ${i + 1}]: ${s}`).join("\n")}`;
+      return `[${focusTitle} FOR: "${cleanQuery}"]:\n${combined.slice(0, 10).map((s, i) => `[Source ${i + 1}]: ${s}`).join("\n")}`;
     }
 
     return null;

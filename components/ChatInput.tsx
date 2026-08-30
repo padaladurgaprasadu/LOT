@@ -1,16 +1,18 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Mic, MicOff, ArrowUp, Square, Paperclip, Sparkles, X, FileCode, ImageIcon, Music } from "lucide-react";
-import { Attachment } from "@/lib/types";
+import { Plus, Mic, MicOff, ArrowUp, Square, Paperclip, Sparkles, X, FileCode, ImageIcon, Music, Globe, Code2, Cpu, Newspaper } from "lucide-react";
+import { Attachment, IndustryFocus } from "@/lib/types";
 
 interface ChatInputProps {
-  onSendMessage: (message: string, attachment?: Attachment) => void;
+  onSendMessage: (message: string, attachment?: Attachment, searchFocus?: IndustryFocus) => void;
   isLoading: boolean;
   onStopGeneration?: () => void;
   onOpenScheduleTasks?: () => void;
   onOpenLotCode?: () => void;
   externalInput?: string;
+  searchFocus?: IndustryFocus;
+  onSearchFocusChange?: (focus: IndustryFocus) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -20,8 +22,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onOpenScheduleTasks,
   onOpenLotCode,
   externalInput,
+  searchFocus = "all",
+  onSearchFocusChange,
 }) => {
   const [input, setInput] = useState("");
+  const [internalFocus, setInternalFocus] = useState<IndustryFocus>(searchFocus);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -209,7 +214,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       if (isListeningRef.current) {
         toggleSpeechRecognition();
       }
-      onSendMessage(input.trim(), attachment || undefined);
+      onSendMessage(input.trim(), attachment || undefined, internalFocus);
       setInput("");
       setAttachment(null);
       if (textareaRef.current) {
@@ -272,8 +277,74 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     reader.readAsText(file);
   };
 
+  const handleSelectFocus = (focus: IndustryFocus) => {
+    setInternalFocus(focus);
+    if (onSearchFocusChange) {
+      onSearchFocusChange(focus);
+    }
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 pb-2 sm:pb-3 pb-safe">
+      {/* Industry Focus Preset Pills */}
+      <div className="flex items-center space-x-1.5 mb-2 overflow-x-auto no-scrollbar py-0.5 select-none">
+        <button
+          type="button"
+          onClick={() => handleSelectFocus("all")}
+          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+            internalFocus === "all"
+              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+          }`}
+          title="General Real-Time Web Grounding"
+        >
+          <Globe className="w-3 h-3 text-zinc-400" />
+          <span>All Web</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSelectFocus("dev")}
+          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+            internalFocus === "dev"
+              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+          }`}
+          title="Target GitHub, StackOverflow, MDN, and RFC Specs"
+        >
+          <Code2 className="w-3 h-3 text-zinc-300" />
+          <span>Dev & Code Specs</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSelectFocus("hardware")}
+          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+            internalFocus === "hardware"
+              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+          }`}
+          title="Target IEEE Papers, TSMC/NVIDIA Whitepapers, and Chip Datasheets"
+        >
+          <Cpu className="w-3 h-3 text-zinc-300" />
+          <span>Hardware & Silicon</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSelectFocus("news")}
+          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+            internalFocus === "news"
+              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+          }`}
+          title="Target Real-Time 2026 Breaking News & Timelines"
+        >
+          <Newspaper className="w-3 h-3 text-zinc-300" />
+          <span>Live News & Events</span>
+        </button>
+      </div>
+
       {/* Attachment Preview Card if image attached */}
       {attachment && (
         <div className="mb-2 flex items-center space-x-2 bg-[#141417] border border-zinc-800 rounded-xl p-2 max-w-xs animate-in fade-in duration-100">

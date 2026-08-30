@@ -29,7 +29,7 @@ import {
   getStoredTasks,
   setStoredTasks,
 } from "../lib/storage";
-import { Conversation, Message, Project, ScheduledTask, UserProfile, Attachment, EntityHeroData } from "../lib/types";
+import { Conversation, Message, Project, ScheduledTask, UserProfile, Attachment, EntityHeroData, IndustryFocus } from "../lib/types";
 import { DEFAULT_MODEL_ID, LOT_SYSTEM_PROMPT } from "../lib/nvidia";
 import { migrateGuestConversationsToUser, saveInputDraft, getInputDraft, clearInputDraft } from "../lib/session";
 
@@ -47,6 +47,7 @@ export default function Home() {
 
   // App data state - Default to unauthenticated guest
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [searchFocus, setSearchFocus] = useState<IndustryFocus>("all");
   const [customPrompt, setCustomPrompt] = useState(LOT_SYSTEM_PROMPT);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -247,8 +248,10 @@ export default function Home() {
   };
 
   // Send message & stream completion with guaranteed Hero image binding
-  const handleSendMessage = async (content: string, attachment?: Attachment) => {
+  const handleSendMessage = async (content: string, attachment?: Attachment, focusOverride?: IndustryFocus) => {
     if ((!content.trim() && !attachment) || isLoading) return;
+
+    const activeFocus = focusOverride || searchFocus;
 
     // Check mandatory authentication
     if (!userProfile.isLoggedIn) {
@@ -423,6 +426,7 @@ export default function Home() {
           model: selectedModel,
           customPrompt,
           attachment,
+          searchFocus: activeFocus,
         }),
         signal: controller.signal,
       });
@@ -614,6 +618,8 @@ export default function Home() {
             onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
             onOpenLotCode={() => setLotCodeOpen(true)}
             externalInput={inputDraft}
+            searchFocus={searchFocus}
+            onSearchFocusChange={setSearchFocus}
           />
         </div>
       </div>

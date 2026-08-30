@@ -1,5 +1,7 @@
 export type Role = "user" | "assistant" | "system";
 
+export type IndustryFocus = "all" | "dev" | "hardware" | "news";
+
 export interface EntityHeroData {
   title: string;
   imageUrl: string;

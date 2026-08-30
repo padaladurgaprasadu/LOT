@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { messages, customPrompt, attachment } = await req.json();
+    const { messages, customPrompt, attachment, searchFocus = "all" } = await req.json();
 
     const activeApiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
     if (!activeApiKey) {
@@ -216,9 +216,10 @@ export async function POST(req: NextRequest) {
 
     // 4. Parallel Non-Blocking Pre-flight Resolution (Pillar 4: Reduce Network Hops)
     const analysis = analyzeQuery(lastUserMessage, !!attachment);
+    const shouldSearch = searchFocus !== "all" || requiresWebSearch(lastUserMessage);
     const [resolvedHero, webGrounding] = await Promise.all([
       analysis.requiresHero && lastUserMessage ? resolveEntityHero(lastUserMessage) : Promise.resolve(null),
-      requiresWebSearch(lastUserMessage) ? performLiveWebSearch(lastUserMessage) : Promise.resolve(null),
+      shouldSearch ? performLiveWebSearch(lastUserMessage, searchFocus) : Promise.resolve(null),
     ]);
 
     // 5. Build Formatted Context with Authoritative Temporal Ground Truth
@@ -235,11 +236,19 @@ export async function POST(req: NextRequest) {
     let baseSystemPrompt = customPrompt || LOT_SYSTEM_PROMPT;
     baseSystemPrompt += `\n\n[AUTHORITATIVE SERVER CLOCK & TEMPORAL CONTEXT]:\nToday's Date: ${currentDateFormatted} (UTC: ${currentUtcString})\nCurrent Year: ${now.getFullYear()}\nCRITICAL RULE: When asked for today's date, day, month, year, or current time, ALWAYS answer with this exact date (${currentDateFormatted}). Never hallucinate a past or future date.`;
 
+    if (searchFocus === "dev") {
+      baseSystemPrompt += `\n\n[VERTICAL FOCUS: DEVELOPER & CODE SPECS]:\nPrioritize official documentation, GitHub repositories, RFCs, and StackOverflow specs. Provide strictly typed, complete code with zero placeholders.`;
+    } else if (searchFocus === "hardware") {
+      baseSystemPrompt += `\n\n[VERTICAL FOCUS: HARDWARE & SILICON INTELLIGENCE]:\nPrioritize IEEE papers, TSMC/NVIDIA whitepapers, chip datasheets, and physical semiconductor microarchitecture metrics (FLOPs/W, SRAM bandwidth, die layouts).`;
+    } else if (searchFocus === "news") {
+      baseSystemPrompt += `\n\n[VERTICAL FOCUS: LIVE NEWS & 2026 EVENT STREAM]:\nFocus strictly on real-time 2026 breaking news and verified current event timelines.`;
+    }
+
     if (analysis.intent === "code_synthesis") {
       baseSystemPrompt += `\n\n${AGENTIC_CODING_SYSTEM_DIRECTIVES}`;
     }
     if (webGrounding) {
-      baseSystemPrompt += `\n\n[VERIFIED REAL-TIME SEARCH RESULTS & LIVE INTERNET GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. You have active real-time web access. Use the above verified live search data as your absolute ground truth. NEVER state you have a knowledge cutoff or lack recent data. Answer directly with the latest facts.`;
+      baseSystemPrompt += `\n\n[VERIFIED REAL-TIME GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. Use the above verified live search data as your absolute ground truth. NEVER state you have a knowledge cutoff. Answer directly with the latest facts.`;
     }
 
     let formattedMessages: any[] = [
