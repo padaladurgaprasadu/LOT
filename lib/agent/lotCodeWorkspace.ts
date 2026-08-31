@@ -399,3 +399,5 @@ export class LotCodeWorkspace {
     return results;
   }
 }
+
+export const lotCodeWorkspace = new LotCodeWorkspace();
