@@ -11,6 +11,7 @@ import { lotDataAgent } from "./domains/dataAgent";
 import { lotBioAgent } from "./domains/bioAgent";
 import { lotDocsAgent } from "./domains/docsAgent";
 import { lotWebAgent } from "./domains/webAgent";
+import { lotHumanBrowserAgent } from "./domains/browserAgent";
 
 export type AgentDomain =
   | "CODE"
@@ -127,8 +128,11 @@ export class AgentOrchestrator {
       }
       case "WEB": {
         const urlMatch = req.query.match(/https?:\/\/[^\s]+/i);
-        const url = urlMatch ? urlMatch[0] : "https://github.com";
-        result = await lotWebAgent.crawlUrl(url);
+        if (urlMatch) {
+          result = await lotWebAgent.crawlUrl(urlMatch[0]);
+        } else {
+          result = await lotHumanBrowserAgent.browseLikeHuman(req.query);
+        }
         break;
       }
       case "CODE":
