@@ -3,6 +3,8 @@
  * Multi-source live search across DuckDuckGo and Wikipedia with zero latency overhead.
  */
 
+import { IndustryFocus } from "./types";
+
 export function requiresWebSearch(query: string): boolean {
   const lower = query.toLowerCase().trim();
 
@@ -112,34 +114,45 @@ async function searchWikipedia(query: string, signal: AbortSignal): Promise<stri
   }
 }
 
-import { IndustryFocus } from "./types";
+function extractSearchKeywords(query: string): string {
+  return query
+    .replace(/^(what\s+is\s+the\s+official\s+github\s+repository\s+for|what\s+is\s+the\s+github\s+for|github\s+repo\s+for|where\s+is\s+the\s+repo\s+for|can\s+you\s+find\s+the\s+github\s+of|give\s+me\s+the\s+github\s+for|find\s+the\s+github\s+for|show\s+me\s+the\s+github\s+for)\s+/i, "")
+    .replace(/[?!.,]+$/, "")
+    .trim();
+}
 
 export async function performLiveWebSearch(query: string, focus: IndustryFocus = "all"): Promise<string | null> {
   const cleanQuery = query.trim();
   if (!cleanQuery) return null;
 
-  // Augment query based on selected vertical industry focus
+  const coreKeywords = extractSearchKeywords(cleanQuery);
+  const isGithubQuery = /\b(github|repo|repository)\b/i.test(cleanQuery);
+
+  // Augment query based on selected vertical industry focus or GitHub intent
   let targetQuery = cleanQuery;
   let focusTitle = "REAL-TIME LIVE WEB";
 
-  if (focus === "dev") {
-    targetQuery = `${cleanQuery} (documentation OR site:github.com OR site:stackoverflow.com OR site:developer.mozilla.org OR RFC)`;
+  if (isGithubQuery) {
+    targetQuery = `${coreKeywords} site:github.com`;
+    focusTitle = "VERIFIED GITHUB REPOSITORY SPEC";
+  } else if (focus === "dev") {
+    targetQuery = `${coreKeywords} (site:github.com OR site:stackoverflow.com OR site:developer.mozilla.org OR documentation)`;
     focusTitle = "VERIFIED DEV & CODE SPECS";
   } else if (focus === "hardware") {
-    targetQuery = `${cleanQuery} (datasheet OR microarchitecture OR site:ieee.org OR site:arxiv.org OR whitepaper OR silicon)`;
+    targetQuery = `${coreKeywords} (datasheet OR microarchitecture OR site:ieee.org OR site:arxiv.org OR whitepaper OR silicon)`;
     focusTitle = "VERIFIED HARDWARE & SILICON INTELLIGENCE";
   } else if (focus === "news") {
-    targetQuery = `${cleanQuery} 2026 breaking news live updates`;
+    targetQuery = `${coreKeywords} 2026 breaking news live updates`;
     focusTitle = "VERIFIED LIVE 2026 NEWS & EVENT STREAM";
   }
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
+    const timeout = setTimeout(() => controller.abort(), 2500);
 
     const [ddgResults, wikiResults] = await Promise.all([
       searchDuckDuckGo(targetQuery, controller.signal),
-      searchWikipedia(cleanQuery, controller.signal),
+      searchWikipedia(coreKeywords, controller.signal),
     ]);
 
     clearTimeout(timeout);

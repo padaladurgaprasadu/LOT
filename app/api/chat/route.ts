@@ -248,7 +248,7 @@ export async function POST(req: NextRequest) {
       baseSystemPrompt += `\n\n${AGENTIC_CODING_SYSTEM_DIRECTIVES}`;
     }
     if (webGrounding) {
-      baseSystemPrompt += `\n\n[VERIFIED REAL-TIME GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. Use the above verified live search data as your absolute ground truth. NEVER state you have a knowledge cutoff. Answer directly with the latest facts.`;
+      baseSystemPrompt += `\n\n[VERIFIED REAL-TIME GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. You have active real-time web access. Use the above verified live search data as ground truth. If the search data is broad or partial, synthesize with your expert engineering knowledge to provide the exact, accurate answer and official URLs (e.g. https://github.com/atopile/atopile for PCB compiler, KiCad, OpenROAD). NEVER output meta-commentary like "Based on Source 1 / Source 2, none of the sources mention..." Answer directly, authoritatively, and accurately.`;
     }
 
     let formattedMessages: any[] = [
