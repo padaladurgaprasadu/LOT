@@ -13,6 +13,8 @@ import {
   Sparkles,
   FileText,
   Puzzle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Conversation, UserProfile } from "@/lib/types";
 
@@ -53,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   const handleStartRename = (conv: Conversation, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,91 +71,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setEditingConvId(null);
   };
 
-  // Group conversations by date
-  const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000;
-  const today = conversations.filter((c) => now - c.updatedAt < oneDay);
-  const yesterday = conversations.filter(
-    (c) => now - c.updatedAt >= oneDay && now - c.updatedAt < 2 * oneDay
+  // Sort conversations chronologically (present / current chats first)
+  const sortedConversations = [...conversations].sort(
+    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)
   );
-  const previous7Days = conversations.filter(
-    (c) => now - c.updatedAt >= 2 * oneDay && now - c.updatedAt < 7 * oneDay
-  );
-  const older = conversations.filter((c) => now - c.updatedAt >= 7 * oneDay);
-
-  const renderSection = (title: string, items: Conversation[]) => {
-    if (items.length === 0) return null;
-    return (
-      <div className="mb-4">
-        <div className="px-3 mb-1.5 text-[11px] font-medium tracking-wider text-zinc-500 uppercase">
-          {title}
-        </div>
-        <div className="space-y-1">
-          {items.map((conv) => {
-            const isActive = conv.id === activeConvId;
-            const isEditing = conv.id === editingConvId;
-
-            return (
-              <div
-                key={conv.id}
-                onClick={() => onSelectConversation(conv.id)}
-                className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 ease-out ${
-                  isActive
-                    ? "bg-[#18181b] text-white font-medium shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-[#121214]"
-                }`}
-              >
-                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
-                  <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                  {isEditing ? (
-                    <form
-                      onSubmit={(e) => handleSaveRename(conv.id, e)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1"
-                    >
-                      <input
-                        type="text"
-                        value={editingTitle}
-                        onChange={(e) => setEditingTitle(e.target.value)}
-                        onBlur={() => setEditingConvId(null)}
-                        autoFocus
-                        className="w-full bg-[#0a0a0c] text-white text-xs px-2 py-1 rounded-lg border border-zinc-700 focus:outline-none"
-                      />
-                    </form>
-                  ) : (
-                    <span className="truncate">{conv.title || "New Chat"}</span>
-                  )}
-                </div>
-
-                {/* Hover Actions: Rename & Delete */}
-                {!isEditing && (
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity">
-                    <button
-                      onClick={(e) => handleStartRename(conv, e)}
-                      className="p-1 hover:text-white rounded hover:bg-zinc-800"
-                      title="Rename"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteConversation(conv.id);
-                      }}
-                      className="p-1 hover:text-red-400 rounded hover:bg-zinc-800"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
+  const INITIAL_LIMIT = 5;
+  const visibleConversations = showAllHistory
+    ? sortedConversations
+    : sortedConversations.slice(0, INITIAL_LIMIT);
+  const remainingCount = sortedConversations.length - INITIAL_LIMIT;
 
   return (
     <>
@@ -238,18 +165,98 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Chat History List */}
-        <div className="flex-1 overflow-y-auto px-3 py-3">
-          {conversations.length === 0 ? (
+        <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
+          {sortedConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center px-4">
               <p className="text-xs text-zinc-600 font-medium">No conversations yet</p>
             </div>
           ) : (
-            <>
-              {renderSection("Today", today)}
-              {renderSection("Yesterday", yesterday)}
-              {renderSection("Previous 7 Days", previous7Days)}
-              {renderSection("Older", older)}
-            </>
+            <div>
+              <div className="px-3 mb-2 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
+                Recent Chats
+              </div>
+              <div className="space-y-1">
+                {visibleConversations.map((conv) => {
+                  const isActive = conv.id === activeConvId;
+                  const isEditing = conv.id === editingConvId;
+
+                  return (
+                    <div
+                      key={conv.id}
+                      onClick={() => onSelectConversation(conv.id)}
+                      className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 ease-out ${
+                        isActive
+                          ? "bg-[#18181b] text-white font-medium shadow-sm"
+                          : "text-zinc-400 hover:text-zinc-200 hover:bg-[#121214]"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                        <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                        {isEditing ? (
+                          <form
+                            onSubmit={(e) => handleSaveRename(conv.id, e)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1"
+                          >
+                            <input
+                              type="text"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onBlur={() => setEditingConvId(null)}
+                              autoFocus
+                              className="w-full bg-[#0a0a0c] text-white text-xs px-2 py-1 rounded-lg border border-zinc-700 focus:outline-none"
+                            />
+                          </form>
+                        ) : (
+                          <span className="truncate">{conv.title || "New Chat"}</span>
+                        )}
+                      </div>
+
+                      {/* Hover Actions: Rename & Delete */}
+                      {!isEditing && (
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity">
+                          <button
+                            onClick={(e) => handleStartRename(conv, e)}
+                            className="p-1 hover:text-white rounded hover:bg-zinc-800"
+                            title="Rename"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteConversation(conv.id);
+                            }}
+                            className="p-1 hover:text-red-400 rounded hover:bg-zinc-800"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* View More / Show Less Button */}
+              {sortedConversations.length > INITIAL_LIMIT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllHistory(!showAllHistory)}
+                  className="w-full mt-2.5 flex items-center justify-center space-x-1.5 px-3 py-2 text-xs text-zinc-400 hover:text-white bg-[#121215] hover:bg-[#18181c] border border-zinc-800/80 rounded-xl transition-all duration-150 active:scale-[0.98]"
+                >
+                  <span className="font-medium">
+                    {showAllHistory ? "Show Less" : `View More (${remainingCount} older)`}
+                  </span>
+                  {showAllHistory ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-zinc-400" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                  )}
+                </button>
+              )}
+            </div>
           )}
         </div>
 

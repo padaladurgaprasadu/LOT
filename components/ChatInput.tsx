@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Mic, MicOff, ArrowUp, Square, Paperclip, Sparkles, X, FileCode, ImageIcon, Music, Globe, Code2, Cpu, Newspaper } from "lucide-react";
+import { Plus, Mic, MicOff, ArrowUp, Square, Paperclip, Sparkles, X, FileCode, ImageIcon, Music, Globe, Code2, Cpu, Newspaper, Check } from "lucide-react";
 import { Attachment, IndustryFocus } from "@/lib/types";
 
 interface ChatInputProps {
@@ -286,65 +286,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 pb-2 sm:pb-3 pb-safe">
-      {/* Industry Focus Preset Pills */}
-      <div className="flex items-center space-x-1.5 mb-2 overflow-x-auto no-scrollbar py-0.5 select-none">
-        <button
-          type="button"
-          onClick={() => handleSelectFocus("all")}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-            internalFocus === "all"
-              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-          }`}
-          title="General Real-Time Web Grounding"
-        >
-          <Globe className="w-3 h-3 text-zinc-400" />
-          <span>All Web</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleSelectFocus("dev")}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-            internalFocus === "dev"
-              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-          }`}
-          title="Target GitHub, StackOverflow, MDN, and RFC Specs"
-        >
-          <Code2 className="w-3 h-3 text-zinc-300" />
-          <span>Dev & Code Specs</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleSelectFocus("hardware")}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-            internalFocus === "hardware"
-              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-          }`}
-          title="Target IEEE Papers, TSMC/NVIDIA Whitepapers, and Chip Datasheets"
-        >
-          <Cpu className="w-3 h-3 text-zinc-300" />
-          <span>Hardware & Silicon</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleSelectFocus("news")}
-          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-            internalFocus === "news"
-              ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-          }`}
-          title="Target Real-Time 2026 Breaking News & Timelines"
-        >
-          <Newspaper className="w-3 h-3 text-zinc-300" />
-          <span>Live News & Events</span>
-        </button>
-      </div>
-
       {/* Attachment Preview Card if image attached */}
       {attachment && (
         <div className="mb-2 flex items-center space-x-2 bg-[#141417] border border-zinc-800 rounded-xl p-2 max-w-xs animate-in fade-in duration-100">
@@ -386,80 +327,159 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
           {/* Plus Menu Popover */}
           {plusMenuOpen && (
-            <div className="absolute bottom-12 left-0 w-48 sm:w-52 bg-[#141418] border border-[#27272a] rounded-2xl shadow-2xl py-1.5 z-50 animate-in fade-in duration-100">
-              <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
-                <Paperclip className="w-3.5 h-3.5 text-zinc-300" />
-                <span>Upload File / Image</span>
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.js,.ts,.tsx,.jsx,.py,.html,.css,.json,.md,.mp3,.wav,.m4a,.ogg,.webm"
-                />
-              </label>
-              <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
-                <Music className="w-3.5 h-3.5 text-zinc-300" />
-                <span>Whisper Audio Transcribe</span>
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  accept=".mp3,.wav,.m4a,.ogg,.webm"
-                />
-              </label>
-              {/* Agentic Coding Modes (Cursor / Claude Code style) */}
-              <button
-                type="button"
-                onClick={() => {
-                  setInput((prev) => `[Coder Mode]: Generate a clean Unified Diff patch to refactor and implement: \n${prev}`);
-                  setPlusMenuOpen(false);
-                  textareaRef.current?.focus();
-                }}
-                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
-              >
-                <FileCode className="w-3.5 h-3.5 text-zinc-300" />
-                <span>Code Refactor & Diff</span>
-              </button>
+            <div className="absolute bottom-12 left-0 w-56 bg-[#141418] border border-[#27272a] rounded-2xl shadow-2xl py-1.5 z-50 animate-in fade-in duration-100 divide-y divide-zinc-800/60">
+              <div className="py-1">
+                <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
+                  <Paperclip className="w-3.5 h-3.5 text-zinc-300" />
+                  <span>Upload File / Image</span>
+                  <input
+                    type="file"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.js,.ts,.tsx,.jsx,.py,.html,.css,.json,.md,.mp3,.wav,.m4a,.ogg,.webm"
+                  />
+                </label>
+                <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
+                  <Music className="w-3.5 h-3.5 text-zinc-300" />
+                  <span>Whisper Audio Transcribe</span>
+                  <input
+                    type="file"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept=".mp3,.wav,.m4a,.ogg,.webm"
+                  />
+                </label>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setInput((prev) => `[Debug & Self-Heal]: Diagnose the error, pinpoint the root cause, and output the fix:\n${prev}`);
-                  setPlusMenuOpen(false);
-                  textareaRef.current?.focus();
-                }}
-                className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
-                <span>Debug & Self-Heal</span>
-              </button>
-
-              {onOpenLotCode && (
+              {/* Vertical Search Grounding Presets */}
+              <div className="py-1">
+                <div className="px-3.5 py-1 text-[10px] uppercase font-semibold text-zinc-500 tracking-wider">
+                  Search Grounding Focus
+                </div>
                 <button
                   type="button"
                   onClick={() => {
-                    onOpenLotCode();
+                    handleSelectFocus("all");
                     setPlusMenuOpen(false);
                   }}
-                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
+                  className={`w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-left transition-colors ${
+                    internalFocus === "all" ? "text-white bg-[#1c1c21] font-medium" : "text-zinc-400 hover:text-white hover:bg-[#18181c]"
+                  }`}
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
-                  <span>LOT CODE Agent</span>
+                  <div className="flex items-center space-x-2.5">
+                    <Globe className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>All Web Grounding</span>
+                  </div>
+                  {internalFocus === "all" && <Check className="w-3.5 h-3.5 text-white" />}
                 </button>
-              )}
 
-              {onOpenScheduleTasks && (
                 <button
+                  type="button"
                   onClick={() => {
-                    onOpenScheduleTasks();
+                    handleSelectFocus("dev");
                     setPlusMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-left transition-colors ${
+                    internalFocus === "dev" ? "text-white bg-[#1c1c21] font-medium" : "text-zinc-400 hover:text-white hover:bg-[#18181c]"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Code2 className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Dev & Code Specs</span>
+                  </div>
+                  {internalFocus === "dev" && <Check className="w-3.5 h-3.5 text-white" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelectFocus("hardware");
+                    setPlusMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-left transition-colors ${
+                    internalFocus === "hardware" ? "text-white bg-[#1c1c21] font-medium" : "text-zinc-400 hover:text-white hover:bg-[#18181c]"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Cpu className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Hardware & Silicon</span>
+                  </div>
+                  {internalFocus === "hardware" && <Check className="w-3.5 h-3.5 text-white" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelectFocus("news");
+                    setPlusMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-left transition-colors ${
+                    internalFocus === "news" ? "text-white bg-[#1c1c21] font-medium" : "text-zinc-400 hover:text-white hover:bg-[#18181c]"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Newspaper className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Live News 2026</span>
+                  </div>
+                  {internalFocus === "news" && <Check className="w-3.5 h-3.5 text-white" />}
+                </button>
+              </div>
+
+              {/* Agentic Tools */}
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInput((prev) => `[Coder Mode]: Generate a clean Unified Diff patch to refactor and implement: \n${prev}`);
+                    setPlusMenuOpen(false);
+                    textareaRef.current?.focus();
+                  }}
+                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
+                >
+                  <FileCode className="w-3.5 h-3.5 text-zinc-300" />
+                  <span>Code Refactor & Diff</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInput((prev) => `[Debug & Self-Heal]: Diagnose the error, pinpoint the root cause, and output the fix:\n${prev}`);
+                    setPlusMenuOpen(false);
+                    textareaRef.current?.focus();
                   }}
                   className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
-                  <span>Schedule Task</span>
+                  <span>Debug & Self-Heal</span>
                 </button>
-              )}
+
+                {onOpenLotCode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenLotCode();
+                      setPlusMenuOpen(false);
+                    }}
+                    className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+                    <span>LOT CODE Agent</span>
+                  </button>
+                )}
+
+                {onOpenScheduleTasks && (
+                  <button
+                    onClick={() => {
+                      onOpenScheduleTasks();
+                      setPlusMenuOpen(false);
+                    }}
+                    className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+                    <span>Schedule Task</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
