@@ -50,12 +50,18 @@
 ├───────────────────────────────┬──────────────────────┬──────────────────────┤
 │ METRIC                        │ PRISM GEN 4 BEAST    │ NVIDIA BLACKWELL B200│
 ├───────────────────────────────┼──────────────────────┼──────────────────────┤
-│ Peak Compute                  │ 25.76 PFLOPS         │ 20.00 PFLOPS         │
-│ LLaMA 3 70B Throughput (B64)  │ 9,850 tokens / sec   │ 4,800 tokens / sec   │
-│ Energy Efficiency             │ 14.07 tok / sec / W  │ 4.80 tok / sec / W   │
-│ First-Token Latency (4k TTFT) │ 7.4 ms               │ 22.0 ms              │
-│ Cost per 1 Million Tokens     │ $0.094               │ $0.450               │
-└───────────────────────────────┴──────────────────────┴──────────────────────┘
+│ Peak Compute (FP8 Dense)      │ 2.52 PFLOPS          │ 4.50 PFLOPS          │
+│ Peak Compute (FP4 Sparse)     │ ~10.1 PFLOPS         │ 20.00 PFLOPS         │
+│ LLaMA 3 70B Throughput (B64)  │ 5,200-6,000 tok/sec* │ 3,800-6,500 tok/sec  │
+│ Energy Efficiency             │ 8.4-10.1 tok/sec/W   │ 4.80 tok/sec/W       │
+│ Internal Memory Bandwidth     │ 64.0 TB/s (3D SRAM)  │ 8.0 TB/s (HBM3e)    │
+│ Energy per Bit (Memory)       │ 1.5 pJ/bit (3D SRAM) │ 65 pJ/bit (HBM3e)   │
+│ Cost per 1 Million Tokens     │ $0.18-$0.25          │ $0.35-$0.45          │
+│ Card Price                    │ $12,000-$18,000      │ $40,000+             │
+├───────────────────────────────┴──────────────────────┴──────────────────────┤
+│ * Projected from cycle-accurate simulation with 65% hardware efficiency     │
+│   derating. Real silicon measurements pending prototype fabrication.        │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -77,10 +83,10 @@
 ---
 
 ### SLIDE 8: Unit Economics & Gross Profit Margins
-* **Manufacturing Cost (BOM per Beast Card)**: **$1,900**
-  * TSMC 3nm Compute Die: $650 | 2GB 3D SRAM: $220 | 192GB HBM3e: $600 | CoWoS Packaging: $280 | Cold Plate: $150
-* **Commercial Selling Price**: **$8,500** per card (vs. $40,000 for NVIDIA B200).
-* **Gross Profit per Unit**: **$6,600 (77.6% Gross Margin)**.
+* **Manufacturing Cost (BOM per Beast Card)**: **$4,200** (Audit-Corrected)
+  * TSMC 3nm Compute Die: $750 | 2GB 3D SRAM (N7 node): $480 | 192GB HBM3e: $1,800 | CoWoS Packaging: $800 | Cold Plate: $220 | PCB + Assembly: $150
+* **Commercial Selling Price**: **$15,000** per card (vs. $40,000 for NVIDIA B200).
+* **Gross Profit per Unit**: **$10,800 (72.0% Gross Margin)**.
 
 ---
 

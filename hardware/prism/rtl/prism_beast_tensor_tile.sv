@@ -3,7 +3,9 @@
 // Project: PRISM Silicon Gen 4
 // Description: 16x16 Mixed-Precision Systolic Matrix-Multiply-Accumulate Tile
 // Target: TSMC N3P Standard Cells @ 2.4 GHz
-// Architecture: 3D Copper-to-Copper Direct-Bonded SRAM Interfaced Matrix Engine
+// Architecture: 3D Cu-Cu Hybrid-Bonded SRAM Interface (6μm pitch, roadmap <1μm)
+// Dense Compute: 2,048 tiles × 256 MACs × 2 × 2.4 GHz = 2.52 PFLOPS FP8
+// With 2:4 Sparsity + FP4: ~10.1 PFLOPS effective
 // ============================================================================
 
 `timescale 1ns / 1ps

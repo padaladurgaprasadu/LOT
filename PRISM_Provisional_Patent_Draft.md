@@ -27,8 +27,8 @@ Conventional high-performance AI accelerators (such as planar graphics processin
 ## 3. SUMMARY OF THE INVENTION
 The present invention discloses a 3D Wafer-on-Wafer integrated circuit architecture comprising:
 1. **A Primary Compute Logic Tier** fabricated on an advanced sub-5nm node (e.g., TSMC N3P) comprising an array of mixed-precision systolic processing elements (PEs) and dedicated hardware FlashAttention engines.
-2. **A Vertically Stacked 3D SRAM Memory Vault Tier** comprising at least 2,048 Megabytes (2.0 GB) of high-density SRAM directly bonded onto the compute tier using copper-to-copper (Cu-Cu) hybrid bonding at a vertical via pitch of less than 1.0 micrometer ($\le 0.9\mu\text{m}$).
-3. **A Sub-Nanosecond Zero-Latency Weight Delivery Crossbar** providing continuous internal memory bandwidth exceeding 64.0 Terabytes per second ($>64.0\text{ TB/s}$) directly to systolic processing elements, slashing data movement energy to under 1.5 picojoules per bit.
+2. **A Vertically Stacked 3D SRAM Memory Vault Tier** comprising at least 2,048 Megabytes (2.0 GB) of high-density SRAM directly bonded onto the compute tier using copper-to-copper (Cu-Cu) hybrid bonding at a vertical via pitch of 6.0 micrometers or less (current production), with a technology roadmap to sub-1.0 micrometer pitch.
+3. **A Sub-Nanosecond Zero-Latency Weight Delivery Crossbar** providing continuous internal memory bandwidth exceeding 64.0 Terabytes per second ($>64.0\text{ TB/s}$) directly to systolic processing elements, slashing data movement energy to approximately 1.5 picojoules per bit (vs. 50-100 pJ/bit for conventional 2.5D HBM interposer architectures).
 
 ---
 
@@ -50,7 +50,7 @@ The compute tier incorporates dedicated non-programmable hard-IP execution pipel
 1. An integrated artificial intelligence accelerator device comprising:
    * a lower semiconductor die comprising a plurality of systolic matrix multiplication tiles and execution schedulers;
    * an upper semiconductor die comprising a high-density static random-access memory (SRAM) array; and
-   * a direct hybrid copper-to-copper (Cu-Cu) bonding interface electrically and mechanically coupling said upper semiconductor die to said lower semiconductor die at a vertical pitch of less than 1.0 micrometer ($\mu\text{m}$), wherein internal bandwidth between said upper die and lower die exceeds 50 Terabytes per second.
+   * a direct hybrid copper-to-copper (Cu-Cu) bonding interface electrically and mechanically coupling said upper semiconductor die to said lower semiconductor die at a vertical pitch of 10.0 micrometers or less, wherein internal bandwidth between said upper die and lower die exceeds 50 Terabytes per second.
 
 2. The device of Claim 1, wherein said lower semiconductor die further comprises a hardware-fused attention engine configured to execute online softmax normalization on streaming tensor vectors without intermediate off-chip memory transactions.
 

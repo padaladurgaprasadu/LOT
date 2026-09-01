@@ -2,15 +2,16 @@
 // Module: prism_sram_vault_controller
 // Project: PRISM Silicon Gen 4
 // Description: 3D Copper-to-Copper Direct-Bonded SRAM Vault Memory Controller
-// Target: TSMC 3D SoIC-X Sub-Micron Vertical Via Interface @ 64.0 TB/s
+// Target: TSMC 3D SoIC-X Hybrid Bonded Interface (6μm pitch, roadmap <1μm)
+// Bandwidth: 128 Banks × 2048-bit × 2.4 GHz = 78.6 TB/s Peak (>64 TB/s spec)
 // ============================================================================
 
 `timescale 1ns / 1ps
 
 module prism_sram_vault_controller #(
-    parameter VAULT_BANKS   = 16,    // 16 Parallel On-Chip Memory Vaults
+    parameter VAULT_BANKS   = 128,   // 128 Parallel On-Chip Memory Vaults
     parameter ADDR_WIDTH    = 24,    // 24-bit Local SRAM Address Space (16MB per Vault)
-    parameter DATA_WIDTH    = 128    // 128-bit Wide Parallel Data Bus per Vault
+    parameter DATA_WIDTH    = 2048   // 2048-bit (256-byte) Wide Parallel Data Bus per Vault
 )(
     input  wire                                 clk,
     input  wire                                 rst_n,
