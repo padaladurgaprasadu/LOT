@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "node:crypto";
 import dns from "node:dns";
 import https from "node:https";
 import { LOT_SYSTEM_PROMPT, DEFAULT_MODEL_ID } from "@/lib/nvidia";
@@ -155,6 +156,26 @@ export async function POST(req: NextRequest) {
 
     const { messages, customPrompt, attachment, searchFocus = "all" } = await req.json();
 
+    // A malformed body previously reached `messages[messages.length - 1]` and threw a
+    // TypeError, which surfaced to the user as a generic 500.
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json(
+        { error: "`messages` must be a non-empty array." },
+        { status: 400 }
+      );
+    }
+    for (const m of messages) {
+      if (!m || typeof m !== "object" || typeof m.role !== "string" || typeof m.content !== "string") {
+        return NextResponse.json(
+          { error: "Each message must have a string `role` and string `content`." },
+          { status: 400 }
+        );
+      }
+    }
+    if (customPrompt !== undefined && typeof customPrompt !== "string") {
+      return NextResponse.json({ error: "`customPrompt` must be a string." }, { status: 400 });
+    }
+
     const activeApiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
     if (!activeApiKey) {
       return NextResponse.json(
@@ -173,9 +194,20 @@ export async function POST(req: NextRequest) {
       targetModel = "nvidia/nemotron-3-nano-30b-a3b";
     }
 
+    // The cache was keyed on (last user message, model) only. Two users asking the same
+    // question got the same cached answer even when one of them had a custom project
+    // system prompt or a different search vertical — leaking one user's tailored answer
+    // to another. Scope the key to everything that changes the response.
+    const promptScope = crypto
+      .createHash("sha256")
+      .update(typeof customPrompt === "string" ? customPrompt : LOT_SYSTEM_PROMPT)
+      .digest("hex")
+      .slice(0, 16);
+    const cacheScope = `${targetModel}|${searchFocus}|${promptScope}`;
+
     // 3. In-Memory LRU Cache Hit (Pillar 3: Add Caching, < 2ms instant response)
     if (!attachment && messages.length <= 2 && lastUserMessage) {
-      const cached = globalResponseCache.get(lastUserMessage, targetModel);
+      const cached = globalResponseCache.get(lastUserMessage, cacheScope);
       if (cached) {
         const encoder = new TextEncoder();
         const cachedStream = new ReadableStream({
@@ -234,7 +266,7 @@ export async function POST(req: NextRequest) {
     const currentUtcString = now.toUTCString();
 
     let baseSystemPrompt = customPrompt || LOT_SYSTEM_PROMPT;
-    baseSystemPrompt += `\n\n[AUTHORITATIVE SERVER CLOCK & TEMPORAL CONTEXT]:\nToday's Date: ${currentDateFormatted} (UTC: ${currentUtcString})\nCurrent Year: ${now.getFullYear()}\nCRITICAL RULE: When asked for today's date, day, month, year, or current time, ALWAYS answer with this exact date (${currentDateFormatted}). Never hallucinate a past or future date.`;
+    baseSystemPrompt += `\n\n[AUTHORITATIVE SERVER CLOCK & TEMPORAL CONTEXT]:\nToday's Date: ${currentDateFormatted} (UTC: ${currentUtcString})\nCurrent Year: ${now.getFullYear()}\nCRITICAL RULE: When asked for today's date, day, month, year, or current time, ALWAYS answer with this exact date (${currentDateFormatted}). Never hallucinate a past or future date.\n\n[CRITICAL LANGUAGE ALIGNMENT DIRECTIVE]:\nYou MUST respond in the EXACT SAME LANGUAGE and SCRIPT as the user's latest message.\n- If the user wrote in English (e.g. "Hello", "Hi", "Tell me about X"), you MUST reply in pure, natural English. Do NOT reply in Telugu or any other language unless the user wrote in Telugu or explicitly asked for it.\n- Only reply in Telugu/Hindi/etc. if the user's message itself is in that language or explicitly requests a translation.`;
 
     if (searchFocus === "dev") {
       baseSystemPrompt += `\n\n[VERTICAL FOCUS: DEVELOPER & CODE SPECS]:\nPrioritize official documentation, GitHub repositories, RFCs, and StackOverflow specs. Provide strictly typed, complete code with zero placeholders.`;
@@ -314,6 +346,7 @@ export async function POST(req: NextRequest) {
         } catch (primaryErr: any) {
           // 1. First Fallback: Ultra-fast Groq LPU if GROQ_API_KEY is configured
           const groqKey = process.env.GROQ_API_KEY;
+          let recovered = false;
           if (groqKey && !attachment) {
             try {
               await streamFromGroq(
@@ -324,12 +357,17 @@ export async function POST(req: NextRequest) {
                 (delta) => (collectedFullResponse += delta),
                 8000
               );
-              return;
-            } catch {}
+              // Previously `return`ed here, which skipped the [DONE] sentinel and
+              // controller.close() below — the client stream never terminated and the
+              // UI hung on "generating" forever after a successful Groq fallback.
+              recovered = true;
+            } catch (groqErr) {
+              console.error("[LOT CHAT] Groq fallback failed:", groqErr);
+            }
           }
 
           // 2. Second Fallback: Secondary NVIDIA model
-          if (targetModel !== "meta/llama-3.2-11b-vision-instruct" && !attachment) {
+          if (!recovered && targetModel !== "meta/llama-3.2-11b-vision-instruct" && !attachment) {
             try {
               await streamFromNvidia(
                 "meta/llama-3.2-11b-vision-instruct",
@@ -340,20 +378,24 @@ export async function POST(req: NextRequest) {
                 8000
               );
             } catch (fallbackErr: any) {
+              console.error("[LOT CHAT] all providers failed:", fallbackErr);
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ Error: ${fallbackErr.message}` } }] })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ The model is temporarily unavailable. Please try again.` } }] })}\n\n`)
               );
             }
-          } else {
+          } else if (!recovered) {
+            console.error("[LOT CHAT] primary provider failed with no usable fallback:", primaryErr);
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ Error: ${primaryErr.message}` } }] })}\n\n`)
+              encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ The model is temporarily unavailable. Please try again.` } }] })}\n\n`)
             );
           }
         }
 
         // 5. Async Caching (Pillar 5: Async everything - off the critical streaming path)
-        if (lastUserMessage && collectedFullResponse) {
-          globalResponseCache.set(lastUserMessage, targetModel, collectedFullResponse, resolvedHero);
+        // Web-grounded answers embed live search results and a server timestamp, so
+        // caching them for 24h served stale "current" facts to later requests.
+        if (lastUserMessage && collectedFullResponse && !webGrounding && !attachment) {
+          globalResponseCache.set(lastUserMessage, cacheScope, collectedFullResponse, resolvedHero);
         }
 
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -379,9 +421,7 @@ export async function POST(req: NextRequest) {
       headers: streamHeaders,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || "Failed to process chat request." },
-      { status: 500 }
-    );
+    console.error("[LOT CHAT] request failed:", err);
+    return NextResponse.json({ error: "Failed to process chat request." }, { status: 500 });
   }
 }
