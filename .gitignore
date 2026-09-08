@@ -18,6 +18,9 @@ node_modules/
 .DS_Store
 *.pem
 
+# Local user database (contains password hashes and salts)
+/data/
+
 # Local env files
 .env*.local
 .env
@@ -35,3 +38,10 @@ research/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Sovereign PRISM Hardware IP Vault (Hidden from public Git until Patent Grant)
+hardware/prism/
+PRISM_*.md
+prism_*.jpg
+GOVERNMENT_SUBMISSION_DOSSIER.md
+

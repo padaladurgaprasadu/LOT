@@ -38,24 +38,25 @@
 
 ---
 
-## 🔬 Hardware Verification & Physical Design Milestones
+## 🔬 Hardware Verification & Architecture Highlights
 
-All silicon assets are open-source and verifiable in this repository:
+* **Architecture**: 3D SoIC Wafer-on-Wafer stacking with Copper-to-Copper (Cu-Cu) direct bonding ($6.0\mu\text{m}$ via pitch).
+* **Memory Subsystem**: 128-bank parallel 3D SRAM Vault ($64.0\text{ TB/s}$ sustained internal throughput at $1.5\text{ pJ/bit}$).
+* **Compute Fabric**: Mixed-precision systolic matrix engine with hardware-fused FlashAttention online normalization.
+* **Pre-Silicon Verification**: $256/256$ processing elements verified bit-accurate under cycle-accurate simulation.
+* **Timing Closure**: Static timing closed at $2.40\text{ GHz}$ on TSMC 3nm (N3P) standard cells (+42.5 ps setup slack).
 
-* **`hardware/prism/rtl/prism_beast_tensor_tile.sv`**: Synthesizable $16 \times 16$ mixed-precision systolic matrix engine.
-* **`hardware/prism/rtl/prism_sram_vault_controller.sv`**: 128-bank parallel arbiter for the **$64.0\text{ TB/s}$ 3D Cu-Cu Direct-Bonded SRAM Vault**.
-* **`hardware/prism/sim/run_rtl_verification.ts`**: Pre-silicon functional verification engine (**256/256 PEs passed with zero timing hazards**).
-* **`hardware/prism/sim/prism_beast_matrix_sim.vcd`**: Value Change Dump waveform trace for GTKWave analysis.
-* **`hardware/prism/synth/prism_beast_constraints.sdc`**: Synopsys Design Constraints (**2.4 GHz target frequency**).
-* **`hardware/prism/synth/openroad_synth.tcl`**: OpenROAD / Yosys physical design synthesis script for TSMC 3nm N3P cells (+42.5 ps timing slack met).
+> [!NOTE]
+> Detailed synthesizable SystemVerilog RTL, gate-level netlists, and physical EDA scripts are held in the sovereign IP vault pending formal patent grant and DLI execution.
 
 ---
 
-## 📑 Strategic & Legal Documentation
+## 📑 Intellectual Property & Legal Notice
 
-* [PRISM Executive Pitch Dossier (10 Slides)](PRISM_Executive_Pitch_Dossier.md)
-* [PRISM Provisional Patent Specification Draft](PRISM_Provisional_Patent_Draft.md)
-* [Government of Andhra Pradesh & ISM Submission Dossier](GOVERNMENT_SUBMISSION_DOSSIER.md)
+* **Patent Status**: Indian Patent Application (Provisional Filed / In-Process) — *Sole Inventor: Padala Durga Prasad*.
+* **Coverage**: Multi-tier 3D direct-bonded SRAM accelerator microarchitecture and hardware-fused attention pipelines.
+* **Contact for Technical Evaluations**: `padalaprasad94@gmail.com`
+
 
 ---
 
