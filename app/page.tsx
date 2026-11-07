@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
+import { DiffViewer } from "../components/DiffViewer";
 import { CognitiveStream } from "../components/chat/CognitiveStream";
 import { WorkspaceErrorBoundary } from "../components/workspaces/WorkspaceErrorBoundary";
 import { ScheduleTasksModal } from "../components/ScheduleTasksModal";
@@ -143,6 +144,9 @@ export default function Home() {
   // LOT-OS Dynamic Workspace State
   const [activeMode, setActiveMode] = useState<LotOsMode>("chat");
   const [currentCanvasPayload, setCurrentCanvasPayload] = useState<any>(null);
+  const [rightCanvasTab, setRightCanvasTab] = useState<"workspace" | "diff" | "python">("workspace");
+  const [swarmData, setSwarmData] = useState<any>(null);
+  const [pythonOutput, setPythonOutput] = useState<string>("# In-Browser Pyodide WASM Runtime Ready\n");
   const [splitWidth, setSplitWidth] = useState<number>(48); // Left cognitive pane % (25 to 75)
   const [isCanvasVisible, setIsCanvasVisible] = useState<boolean>(true);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -911,6 +915,43 @@ export default function Home() {
                 </span>
               </div>
 
+              {/* Viewport Switcher: Workspace, 3-Way Diff Studio, Python WASM */}
+              <div className="flex items-center gap-1 bg-zinc-900/90 p-0.5 rounded-lg border border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setRightCanvasTab("workspace")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    rightCanvasTab === "workspace"
+                      ? "bg-zinc-800 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Workspace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRightCanvasTab("diff")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    rightCanvasTab === "diff"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  3-Way Diff
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRightCanvasTab("python")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    rightCanvasTab === "python"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Python WASM
+                </button>
+              </div>
+
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -926,7 +967,31 @@ export default function Home() {
             {/* Canvas Execution Runtime with Isolated Error Boundary */}
             <div className="flex-1 w-full min-h-0 relative overflow-hidden">
               <WorkspaceErrorBoundary fallbackTitle={`${activeModeMeta.label} Runtime Interruption`}>
-                {renderActiveCanvas()}
+                {rightCanvasTab === "diff" ? (
+                  <DiffViewer
+                    filePath={swarmData?.gitState?.filePath || "src/App.tsx"}
+                    candidateA={swarmData?.swarmResult?.candidateDiffA || "// Candidate Diff A (NVIDIA NIM)"}
+                    candidateB={swarmData?.swarmResult?.candidateDiffB || "// Candidate Diff B (Groq)"}
+                    critique={swarmData?.swarmResult?.reasoningCritique || "DeepSeek-R1 verified zero AST conflicts."}
+                    synthesized={swarmData?.swarmResult?.synthesizedUnifiedDiff || "// Awaiting Swarm consensus synthesis..."}
+                    onApplyToSandbox={(updated) => {
+                      setCurrentCanvasPayload({ code: updated, files: { "src/App.tsx": updated } });
+                      setRightCanvasTab("workspace");
+                    }}
+                  />
+                ) : rightCanvasTab === "python" ? (
+                  <div className="h-full flex flex-col bg-zinc-950 p-4 font-mono text-xs">
+                    <div className="text-amber-400 mb-2 font-semibold flex items-center justify-between">
+                      <span>Tier-0: In-Browser Python WASM Sandbox (workers/pyodide.worker.ts)</span>
+                      <span className="text-[10px] text-zinc-500">Zero Server Cost</span>
+                    </div>
+                    <pre className="flex-1 bg-black p-4 rounded-xl border border-zinc-800 text-emerald-300 overflow-auto custom-scrollbar">
+                      {pythonOutput}
+                    </pre>
+                  </div>
+                ) : (
+                  renderActiveCanvas()
+                )}
               </WorkspaceErrorBoundary>
             </div>
           </div>

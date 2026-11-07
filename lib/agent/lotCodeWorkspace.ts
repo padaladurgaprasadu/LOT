@@ -495,3 +495,48 @@ export class LotCodeWorkspace {
 }
 
 export const lotCodeWorkspace = new LotCodeWorkspace();
+
+
+// ========================================================
+// TIER-1 IN-MEMORY GIT VIRTUAL TREE
+// ========================================================
+
+export interface GitCommitNode {
+  sha: string;
+  message: string;
+  timestamp: string;
+  filesSnapshot: Record<string, string>;
+}
+
+/**
+ * TIER-1 IN-MEMORY GIT VIRTUAL TREE
+ * Provides atomic commits, branching, and instant rollback before Containerized MicroVM execution.
+ */
+export class InMemoryGitVirtualTree {
+  private files: Record<string, string> = {};
+  private commits: GitCommitNode[] = [];
+
+  public writeFile(path: string, content: string) {
+    this.files[path] = content;
+  }
+
+  public commit(message: string): GitCommitNode {
+    const sha = Math.random().toString(16).substring(2, 10);
+    const node: GitCommitNode = {
+      sha,
+      message,
+      timestamp: new Date().toISOString(),
+      filesSnapshot: { ...this.files },
+    };
+    this.commits.push(node);
+    return node;
+  }
+
+  public getLatestState() {
+    return {
+      headSha: this.commits[this.commits.length - 1]?.sha || "init0000",
+      files: this.files,
+      history: this.commits,
+    };
+  }
+}

@@ -134,3 +134,67 @@ export class HitlPermissionGate {
 }
 
 export const hitlGate = HitlPermissionGate.getInstance();
+
+
+// ========================================================
+// 3-TIER HITL SAFETY GATE FOR SPECULATIVE AGENT SWARM
+// ========================================================
+
+import { StrixAuditReport } from "./strixSecurityAuditor";
+
+export type HITLRouteChannel =
+  | "approved: preview"
+  | "approved: hardware"
+  | "approved: script"
+  | "approved: commit"
+  | "blocked: requires_human_override";
+
+export interface HITLDecision {
+  tier: "TIER_1_AUTO" | "TIER_2_DIFF_REVIEW" | "TIER_3_HARD_LOCK";
+  channel: HITLRouteChannel;
+  approved: boolean;
+  reason: string;
+}
+
+/**
+ * 3-TIER HITL SAFETY GATE
+ * Routes taint-clean code to the exact Polyglot Zero-Cost Sandbox channel shown in the diagram.
+ */
+export class ThreeTierHITLGate {
+  public static evaluate(
+    targetType: "preview" | "hardware" | "script" | "commit",
+    audit: StrixAuditReport
+  ): HITLDecision {
+    if (!audit.taintClean) {
+      return {
+        tier: "TIER_3_HARD_LOCK",
+        channel: "blocked: requires_human_override",
+        approved: false,
+        reason: `Halted by Strix Gate (Risk ${audit.riskScore}/100): ${audit.findings.join(", ")}`,
+      };
+    }
+
+    if (targetType === "commit" || audit.riskScore >= 40) {
+      return {
+        tier: "TIER_2_DIFF_REVIEW",
+        channel: "approved: commit",
+        approved: true,
+        reason: "Staged in In-Memory Git Virtual Tree; awaiting 1-click user diff approval.",
+      };
+    }
+
+    const channelMap: Record<"preview" | "hardware" | "script" | "commit", HITLRouteChannel> = {
+      preview: "approved: preview",
+      hardware: "approved: hardware",
+      script: "approved: script",
+      commit: "approved: commit",
+    };
+
+    return {
+      tier: "TIER_1_AUTO",
+      channel: channelMap[targetType],
+      approved: true,
+      reason: "Taint-clean code auto-routed to Tier-0 Browser WASM Sandbox.",
+    };
+  }
+}
