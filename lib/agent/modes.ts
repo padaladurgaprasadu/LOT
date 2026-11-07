@@ -25,10 +25,10 @@ export const LOT_MODES: Record<LotAgentMode, AgentModeConfig> = {
   },
   act: {
     mode: "act",
-    name: "Autonomous Action Mode",
-    description: "Active development mode with file editing, diff synthesis, and test runner execution.",
+    name: "Build Mode",
+    description: "The agent reads the workspace, writes real diffs, and shows each change for one-click approval before it lands.",
     allowFileWrite: true,
-    allowCommandExecution: true,
+    allowCommandExecution: false,
     enforceSecurityReview: true,
   },
   audit: {
@@ -41,10 +41,10 @@ export const LOT_MODES: Record<LotAgentMode, AgentModeConfig> = {
   },
   auto: {
     mode: "auto",
-    name: "Unattended CI/CD Mode",
-    description: "Fully automated pipeline for GitHub Actions, unattended PR resolution, and scheduled refactoring.",
+    name: "Auto-Apply Mode",
+    description: "The agent applies its own changes to the workspace as it goes; you review the finished result.",
     allowFileWrite: true,
-    allowCommandExecution: true,
+    allowCommandExecution: false,
     enforceSecurityReview: true,
   },
 };

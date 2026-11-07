@@ -6,10 +6,14 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
-    const skills = globalSkillRegistry.listSkills();
+    // Skill toggles are per user, so read the caller's overlay when they are signed in.
+    const token = req.cookies.get("lot_session_token")?.value;
+    const session = token ? verifyJwt(token) : null;
+    const skills = globalSkillRegistry.listSkills(session?.userId);
     return NextResponse.json({ skills });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Failed to load skills" }, { status: 500 });
+    console.error("[LOT SKILLS] list failed:", error);
+    return NextResponse.json({ error: "Failed to load skills" }, { status: 500 });
   }
 }
 
@@ -23,17 +27,21 @@ export async function POST(req: NextRequest) {
 
     const { skillId, enabled } = await req.json();
 
-    if (!skillId || typeof enabled !== "boolean") {
+    if (!skillId || typeof skillId !== "string" || typeof enabled !== "boolean") {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    const updated = globalSkillRegistry.toggleSkill(skillId, enabled);
+    const updated = globalSkillRegistry.toggleSkill(skillId, enabled, session.userId);
     if (!updated) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, skills: globalSkillRegistry.listSkills() });
+    return NextResponse.json({
+      success: true,
+      skills: globalSkillRegistry.listSkills(session.userId),
+    });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Failed to update skill" }, { status: 500 });
+    console.error("[LOT SKILLS] toggle failed:", error);
+    return NextResponse.json({ error: "Failed to update skill" }, { status: 500 });
   }
 }

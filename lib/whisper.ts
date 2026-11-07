@@ -22,40 +22,42 @@ export async function transcribeAudioWithWhisper(
 ): Promise<WhisperTranscriptionResult> {
   const apiKey = process.env.OPENAI_API_KEY || process.env.WHISPER_API_KEY;
 
-  if (apiKey) {
-    try {
-      const formData = new FormData();
-      const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
-      formData.append("file", blob, fileName);
-      formData.append("model", "whisper-1");
-      formData.append("response_format", "verbose_json");
-
-      const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return {
-          text: data.text || "",
-          language: data.language || "en",
-          duration: data.duration || 0,
-          segments: data.segments || [],
-        };
-      }
-    } catch (err: any) {
-      console.warn("OpenAI Whisper cloud transcription error:", err.message);
-    }
+  if (!apiKey) {
+    // Returning a canned sentence here made a misconfigured server look like a working
+    // transcriber and silently put text the user never said into their message box.
+    throw new Error(
+      "Speech-to-text is not configured on this server. Set OPENAI_API_KEY (or WHISPER_API_KEY) to enable voice transcription."
+    );
   }
 
-  // Fast Fallback Simulation / Parser for environments without direct OpenAI Key
-  return {
-    text: "Transcribed speech input via Whisper engine.",
-    language: "en",
-    duration: 1.5,
-  };
+  try {
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
+    formData.append("file", blob, fileName);
+    formData.append("model", "whisper-1");
+    formData.append("response_format", "verbose_json");
+
+    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      throw new Error(`Whisper transcription failed with HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return {
+      text: data.text || "",
+      language: data.language || "en",
+      duration: data.duration || 0,
+      segments: data.segments || [],
+    };
+  } catch (err: any) {
+    console.error("OpenAI Whisper transcription error:", err?.message);
+    throw new Error(err?.message || "Whisper transcription failed");
+  }
 }

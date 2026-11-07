@@ -7,6 +7,8 @@ interface DiffViewerProps {
   filePath?: string;
   diffText: string;
   onApply?: (filePath: string, newContent: string) => void;
+  /** When the agent already applied this change (auto-apply mode), show it as applied. */
+  preApplied?: boolean;
 }
 
 interface DiffLine {
@@ -66,9 +68,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   filePath,
   diffText,
   onApply,
+  preApplied = false,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied] = useState(preApplied);
 
   const parsed = parseDiff(diffText);
   const targetFile = filePath || parsed.filePath;

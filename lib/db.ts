@@ -16,31 +16,46 @@ export interface StoredUser {
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "lot_users.json");
 
+/**
+ * Seeds the very first admin account only when BOTH env vars are supplied.
+ * A hardcoded default admin + password in source is a published credential:
+ * anyone who reads the repo can sign in as admin on every deployment.
+ */
+function buildSeedUsers(): StoredUser[] {
+  const seedEmail = process.env.LOT_SEED_ADMIN_EMAIL?.toLowerCase().trim();
+  const seedPassword = process.env.LOT_SEED_ADMIN_PASSWORD;
+  const seedName = process.env.LOT_SEED_ADMIN_NAME?.trim() || "LOT Administrator";
+
+  if (!seedEmail || !seedPassword) return [];
+
+  const { hash, salt } = hashPassword(seedPassword);
+  return [
+    {
+      id: `user_admin_${Date.now()}`,
+      name: seedName,
+      email: seedEmail,
+      passwordHash: hash,
+      salt,
+      role: "admin",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  ];
+}
+
 function ensureDbFile(): StoredUser[] {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(DB_FILE)) {
-      // Initialize with default admin user (Durga)
-      const { hash, salt } = hashPassword("Admin@LOT2026!");
-      const defaultUsers: StoredUser[] = [
-        {
-          id: "user_durga_master",
-          name: "Durga prasadu padala",
-          email: "durgaprasadu@lot.ai",
-          passwordHash: hash,
-          salt,
-          role: "admin",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-      ];
-      fs.writeFileSync(DB_FILE, JSON.stringify(defaultUsers, null, 2), "utf8");
-      return defaultUsers;
+      const seedUsers = buildSeedUsers();
+      fs.writeFileSync(DB_FILE, JSON.stringify(seedUsers, null, 2), "utf8");
+      return seedUsers;
     }
     const raw = fs.readFileSync(DB_FILE, "utf8");
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     console.error("Failed to read DB file:", err);
     return [];
@@ -123,22 +138,10 @@ export function updateUserName(identifier: string, newName: string): StoredUser 
     (u) => u.id === identifier || u.email.toLowerCase() === identifier.toLowerCase().trim()
   );
 
+  // Previously an unknown identifier silently created an admin account with a
+  // hardcoded password. Renaming a user must never mint a new account.
   if (index === -1) {
-    // If not found in file (e.g. master default), update master record
-    const { hash, salt } = hashPassword("Admin@LOT2026!");
-    const defaultUser: StoredUser = {
-      id: "user_durga_master",
-      name: newName.trim(),
-      email: "durgaprasadu@lot.ai",
-      passwordHash: hash,
-      salt,
-      role: "admin",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    users.push(defaultUser);
-    saveDb(users);
-    return defaultUser;
+    throw new Error("No account found for this user");
   }
 
   users[index].name = newName.trim();

@@ -25,6 +25,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState(userProfile.email || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // Changing a password now requires proving ownership of the account.
+  const [currentPassword, setCurrentPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -73,10 +75,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           throw new Error("Passwords do not match");
         }
 
+        if (!currentPassword) {
+          throw new Error("Enter your current password to set a new one.");
+        }
+
         const res = await fetch("/api/auth/reset-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, newPassword: password }),
+          body: JSON.stringify({ email, currentPassword, newPassword: password }),
         });
 
         const data = await res.json();
@@ -92,9 +98,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         };
 
         onAuthSuccess(updatedProfile);
-        setSuccessMsg("Password reset successfully! Signed in.");
+        setSuccessMsg("Password updated successfully! Signed in.");
         setPassword("");
         setConfirmPassword("");
+        setCurrentPassword("");
 
         setTimeout(() => {
           setSuccessMsg(null);
@@ -226,7 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {userProfile.isLoggedIn
               ? "Account Profile"
               : mode === "forgot"
-              ? "Reset your password"
+              ? "Change your password"
               : mode === "signup"
               ? "Create your LOT account"
               : "Sign in to LOT"}
@@ -235,7 +242,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {userProfile.isLoggedIn
               ? "Manage your display name and session"
               : mode === "forgot"
-              ? "Create a new strong, secure password"
+              ? "Confirm your current password, then choose a new one"
               : mode === "signup"
               ? "Sign up is mandatory to start using LOT AI"
               : "Welcome back! Enter your credentials"}
@@ -362,6 +369,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
+              {mode === "forgot" && (
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-zinc-300">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    placeholder="Your existing password"
+                    className="w-full bg-[#141416] text-white text-xs px-3.5 py-2.5 rounded-xl border border-zinc-800 focus:border-zinc-500 focus:outline-none transition-colors"
+                  />
+                  <p className="text-[10px] text-zinc-500">
+                    Required to confirm this account is yours.
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-semibold text-zinc-300">
@@ -376,7 +401,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       }}
                       className="text-[11px] text-zinc-400 hover:text-white transition-colors"
                     >
-                      Forgot password?
+                      Change password
                     </button>
                   )}
                 </div>
@@ -488,7 +513,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading || ((mode === "signup" || mode === "forgot") && !isPasswordStrictlyValid)}
+                disabled={
+                  loading ||
+                  ((mode === "signup" || mode === "forgot") && !isPasswordStrictlyValid) ||
+                  (mode === "forgot" && !currentPassword)
+                }
                 className="w-full py-2.5 mt-2 bg-white hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold text-xs rounded-xl shadow-lg transition-all duration-150 active:scale-[0.98] flex items-center justify-center space-x-2"
               >
                 {loading ? (
@@ -496,7 +525,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 ) : (
                   <span>
                     {mode === "forgot"
-                      ? "Reset Password & Sign In"
+                      ? "Update Password & Sign In"
                       : mode === "signup"
                       ? "Create Account"
                       : "Sign In"}

@@ -129,11 +129,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
         const cleanCode = codeText.replace(/^\/\/.*$/gm, "").trim();
         const fn = new Function(cleanCode);
-        const result = fn();
-
-        console.log = originalLog;
-        console.error = originalError;
-        console.warn = originalWarn;
+        let result: unknown;
+        try {
+          result = fn();
+        } finally {
+          // These restores used to sit after fn(), so any snippet that threw left
+          // console.log/error/warn permanently hijacked for the rest of the session —
+          // every later log silently went into this run's `logs` array instead.
+          console.log = originalLog;
+          console.error = originalError;
+          console.warn = originalWarn;
+        }
 
         let outputText = logs.join("\n");
         if (result !== undefined && !outputText.includes(String(result))) {

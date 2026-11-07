@@ -8,6 +8,8 @@
  * - 5. Extracts verified citations and structures ground truth answers
  */
 
+import { safeFetchText } from "../safeFetch";
+
 export interface BrowserActionStep {
   stepNumber: number;
   action: "NAVIGATE" | "SEARCH" | "SCROLL" | "CLICK" | "EXTRACT";
@@ -54,19 +56,18 @@ export class LotHumanBrowserAgent {
       timestamp: Date.now(),
     });
 
-    let rawHtml = "";
-    try {
-      const res = await fetch(searchUrl, {
-        headers: {
-          "User-Agent": this.userAgents[0],
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-      });
-      rawHtml = await res.text();
-    } catch {
-      rawHtml = "";
-    }
+    // seedUrl may be caller-supplied, and the bare fetch had no timeout at all —
+    // a slow host would hang the request until the platform killed it.
+    const searchRes = await safeFetchText(searchUrl, {
+      timeoutMs: 4000,
+      maxBytes: 512 * 1024,
+      headers: {
+        "User-Agent": this.userAgents[0],
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    const rawHtml = searchRes.ok ? searchRes.body : "";
 
     // Step 2: Extract top organic result links (mimicking human eye scan)
     const linkRegex = /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
@@ -121,32 +122,26 @@ export class LotHumanBrowserAgent {
         timestamp: Date.now(),
       });
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2500);
+      // primaryUrl is attacker-influenceable (it comes from a search result page),
+      // so the deep-navigate hop goes through the SSRF guard as well.
+      const pageRes = await safeFetchText(primaryUrl, {
+        timeoutMs: 2500,
+        maxBytes: 512 * 1024,
+        headers: { "User-Agent": this.userAgents[0] },
+      });
 
-        const pageRes = await fetch(primaryUrl, {
-          headers: { "User-Agent": this.userAgents[0] },
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-
-        if (pageRes.ok) {
-          const pageHtml = await pageRes.text();
-          // Human-like DOM cleaning: strip scripts, styles, navigations, footers
-          deepPageText = pageHtml
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-            .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, "")
-            .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "")
-            .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 4000);
-        }
-      } catch {
-        deepPageText = "";
+      if (pageRes.ok) {
+        // Human-like DOM cleaning: strip scripts, styles, navigations, footers
+        deepPageText = pageRes.body
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+          .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, "")
+          .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, "")
+          .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 4000);
       }
     }
 
@@ -170,10 +165,22 @@ export class LotHumanBrowserAgent {
       extractedMarkdown: deepPageText
         ? `### 🌐 Deep Browsed Content from: ${primaryUrl}\n\n${deepPageText}`
         : sources.map((s, i) => `[Source ${i + 1}]: ${s.snippet}`).join("\n\n"),
-      keyFindings: keyFindings.length > 0 ? keyFindings : ["Direct real-time factual confirmation established."],
+      keyFindings:
+        keyFindings.length > 0
+          ? keyFindings
+          : ["No verifiable content could be extracted for this query."],
       sources,
-      confidenceScore: 0.96,
+      // Report confidence that reflects what was actually retrieved. A fixed 0.96 made
+      // an empty, failed browse look as trustworthy as a fully grounded one.
+      confidenceScore: this.scoreConfidence(sources.length, deepPageText.length),
     };
+  }
+
+  private scoreConfidence(sourceCount: number, deepTextLength: number): number {
+    if (sourceCount === 0 && deepTextLength === 0) return 0;
+    const sourceScore = Math.min(sourceCount, 4) * 0.15;
+    const depthScore = deepTextLength > 500 ? 0.35 : deepTextLength > 100 ? 0.15 : 0;
+    return Math.min(0.95, Number((sourceScore + depthScore).toFixed(2)));
   }
 }
 

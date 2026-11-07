@@ -1,8 +1,25 @@
 import crypto from "crypto";
 
-const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || "lot_master_sovereign_secret_key_32bytes_v1!";
+/**
+ * A hardcoded fallback key means every deployment shares one key and anyone with the
+ * source can decrypt stored API keys, so production requires a real ENCRYPTION_SECRET.
+ */
+function resolveEncryptionSecret(): string {
+  const fromEnv = process.env.ENCRYPTION_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "ENCRYPTION_SECRET is missing or shorter than 32 characters. Set a strong ENCRYPTION_SECRET before starting LOT in production."
+    );
+  }
+
+  console.warn("[LOT CRYPTO] ENCRYPTION_SECRET is not set — using an ephemeral development key. Encrypted data will not survive a restart.");
+  return crypto.randomBytes(48).toString("hex");
+}
+
 // Ensure 32 bytes for AES-256
-const ENCRYPTION_KEY = crypto.createHash("sha256").update(ENCRYPTION_SECRET).digest();
+const ENCRYPTION_KEY = crypto.createHash("sha256").update(resolveEncryptionSecret()).digest();
 
 /**
  * Hash password using native Scrypt with 16-byte cryptographically secure random salt

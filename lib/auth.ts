@@ -1,6 +1,30 @@
 import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || "lot_jwt_secure_auth_token_signing_secret_key_2026";
+/**
+ * Signing secret. NEVER ship a hardcoded fallback: a committed default secret lets
+ * anyone who has read the source forge a session token for any account (including admin).
+ * In production a real JWT_SECRET is mandatory. In development we fall back to an
+ * ephemeral random secret, which only invalidates tokens across restarts.
+ */
+function resolveJwtSecret(): string {
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv && fromEnv.length >= 32) return fromEnv;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET is missing or shorter than 32 characters. Set a strong JWT_SECRET before starting LOT in production."
+    );
+  }
+
+  if (fromEnv) {
+    console.warn("[LOT AUTH] JWT_SECRET is shorter than 32 characters — using an ephemeral development secret instead.");
+  } else {
+    console.warn("[LOT AUTH] JWT_SECRET is not set — using an ephemeral development secret. Sessions reset on restart.");
+  }
+  return crypto.randomBytes(48).toString("hex");
+}
+
+const JWT_SECRET = resolveJwtSecret();
 
 interface JwtPayload {
   userId: string;
@@ -76,9 +100,18 @@ export function verifyJwt(token: string): JwtPayload | null {
       return null;
     }
 
+    const header = JSON.parse(base64UrlDecode(encodedHeader));
+    if (!header || header.alg !== "HS256") {
+      return null; // Reject "none"/alg-confusion tokens
+    }
+
     const payload: JwtPayload = JSON.parse(base64UrlDecode(encodedPayload));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return null; // Expired
+    // A token with no expiry is treated as invalid rather than as one that never expires.
+    if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    if (!payload.userId) {
+      return null;
     }
 
     return payload;

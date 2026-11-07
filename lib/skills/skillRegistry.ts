@@ -88,28 +88,45 @@ export const DEFAULT_SKILLS: SkillManifest[] = [
   ...AWESOME_SKILLS_CATALOG,
 ];
 
+/**
+ * Skill enablement is PER USER.
+ *
+ * The registry previously held one shared manifest list and toggleSkill() mutated it in
+ * place, so any signed-in user turning a skill off turned it off for every other user of
+ * the same server process — and the change silently reverted on the next deploy.
+ * Defaults stay immutable; each user gets an overlay of their own overrides.
+ */
 export class SkillRegistryManager {
-  private skills: Map<string, SkillManifest> = new Map();
+  private readonly defaults: Map<string, SkillManifest> = new Map();
+  private readonly userOverrides: Map<string, Map<string, boolean>> = new Map();
 
   constructor() {
-    DEFAULT_SKILLS.forEach((s) => this.skills.set(s.id, s));
+    DEFAULT_SKILLS.forEach((s) => this.defaults.set(s.id, { ...s }));
   }
 
-  public listSkills(): SkillManifest[] {
-    return Array.from(this.skills.values());
+  public listSkills(userId?: string): SkillManifest[] {
+    const overrides = userId ? this.userOverrides.get(userId) : undefined;
+    return Array.from(this.defaults.values()).map((skill) => {
+      const override = overrides?.get(skill.id);
+      return override === undefined ? { ...skill } : { ...skill, enabled: override };
+    });
   }
 
-  public toggleSkill(id: string, enabled: boolean): boolean {
-    const skill = this.skills.get(id);
-    if (skill) {
-      skill.enabled = enabled;
-      return true;
+  public toggleSkill(id: string, enabled: boolean, userId?: string): boolean {
+    if (!this.defaults.has(id)) return false;
+    if (!userId) return false;
+
+    let overrides = this.userOverrides.get(userId);
+    if (!overrides) {
+      overrides = new Map();
+      this.userOverrides.set(userId, overrides);
     }
-    return false;
+    overrides.set(id, enabled);
+    return true;
   }
 
-  public getActiveDirectives(): string {
-    const active = Array.from(this.skills.values()).filter((s) => s.enabled);
+  public getActiveDirectives(userId?: string): string {
+    const active = this.listSkills(userId).filter((s) => s.enabled);
     if (active.length === 0) return "";
     return active.map((s) => `[SKILL: ${s.name.toUpperCase()}]: ${s.systemDirective}`).join("\n");
   }

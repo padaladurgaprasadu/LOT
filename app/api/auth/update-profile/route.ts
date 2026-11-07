@@ -7,23 +7,30 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("lot_session_token")?.value;
-    const { name, email } = await req.json();
+    const session = token ? verifyJwt(token) : null;
+
+    // Previously an unauthenticated caller could pass any email in the body — or nothing
+    // at all, which defaulted to the built-in admin id — and rename that account.
+    // The profile being edited is now always the authenticated caller's own.
+    if (!session) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const { name } = await req.json();
 
     if (!name || typeof name !== "string" || name.trim().length < 2) {
       return NextResponse.json({ error: "Name must be at least 2 characters" }, { status: 400 });
     }
-
-    let targetId = "user_durga_master";
-    if (token) {
-      const payload = verifyJwt(token);
-      if (payload?.userId) {
-        targetId = payload.userId;
-      }
-    } else if (email) {
-      targetId = email;
+    if (name.trim().length > 80) {
+      return NextResponse.json({ error: "Name must be 80 characters or fewer" }, { status: 400 });
     }
 
-    const updatedUser = updateUserName(targetId, name);
+    const existing = findUserById(session.userId);
+    if (!existing) {
+      return NextResponse.json({ error: "Account no longer exists" }, { status: 404 });
+    }
+
+    const updatedUser = updateUserName(existing.id, name);
 
     const newToken = signJwt({
       userId: updatedUser.id,
@@ -54,9 +61,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Failed to update profile" },
-      { status: 500 }
-    );
+    console.error("[LOT AUTH] update-profile failed:", error);
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
   }
 }

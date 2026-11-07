@@ -63,9 +63,8 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Internal server error during login" },
-      { status: 500 }
-    );
+    // Never echo raw internal error text back to the client.
+    console.error("[LOT AUTH] signin failed:", error);
+    return NextResponse.json({ error: "Internal server error during login" }, { status: 500 });
   }
 }

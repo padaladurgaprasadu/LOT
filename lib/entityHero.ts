@@ -67,13 +67,16 @@ async function fetchWikipediaSummary(title: string, signal: AbortSignal): Promis
       /\b(physicist|mathematician|scientist|astronomer|chemist|biologist|engineer|architect|inventor|pioneer|explorer|astronaut|leader|ruler|monarch|emperor|empress|king|queen|prince|princess|president|prime minister|chancellor|governor|politician|freedom fighter|revolutionary|activist|soldier|general|commander|philosopher|economist|scholar|historian|professor|author|writer|novelist|poet|playwright|journalist|artist|painter|sculptor|director|actor|actress|musician|composer|singer|dancer|athlete|cricketer|footballer|champion|founder|ceo|industrialist|entrepreneur|philanthropist|saint|guru|pope|monk|born|died)\b/i.test(combined);
 
     if (isEntity) {
-      const fastImageUrl = data.thumbnail?.source || data.originalimage?.source;
-      const fallbackUrl = data.originalimage?.source || data.thumbnail?.source;
+      // imageUrl is the full-size hero and thumbnailUrl the small preview; these were
+      // swapped, so the layout loaded a thumbnail as the hero and the full-resolution
+      // original as the "thumbnail".
+      const fullImageUrl = data.originalimage?.source || data.thumbnail?.source;
+      const thumbnailSource = data.thumbnail?.source || data.originalimage?.source;
 
       return {
         title: data.title || title,
-        imageUrl: proxyUrl(fastImageUrl),
-        thumbnailUrl: proxyUrl(fallbackUrl),
+        imageUrl: proxyUrl(fullImageUrl),
+        thumbnailUrl: proxyUrl(thumbnailSource),
         description: data.description || data.extract?.slice(0, 120) || "",
         source: "Wikipedia / Wikimedia Commons",
       };

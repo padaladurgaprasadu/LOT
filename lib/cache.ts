@@ -34,11 +34,15 @@ class FastLRUCache<T> {
   }
 
   set(key: string, value: T, ttlMs?: number): void {
-    if (this.cache.size >= this.maxItems) {
+    // Overwriting an existing key does not grow the map, so evicting on it needlessly
+    // discarded a live entry and let the cache sit permanently one item below capacity.
+    if (!this.cache.has(key) && this.cache.size >= this.maxItems) {
       // Evict oldest entry (first key in map)
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) this.cache.delete(oldestKey);
     }
+    // Re-insert at the end so the LRU order reflects this write.
+    this.cache.delete(key);
 
     const expiresAt = Date.now() + (ttlMs || this.defaultTtlMs);
     this.cache.set(key, { value, expiresAt });

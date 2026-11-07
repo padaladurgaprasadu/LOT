@@ -29,11 +29,18 @@ interface LotCodeModalProps {
   initialPrompt?: string;
 }
 
+interface DiffBlock {
+  filePath: string;
+  diff: string;
+  requiresApproval?: boolean;
+  applied?: boolean;
+}
+
 interface LogEntry {
   type: "thought" | "tool" | "diff" | "verification" | "error" | "done";
   message: string;
   timestamp: string;
-  diffBlock?: { filePath: string; diff: string };
+  diffBlock?: DiffBlock;
 }
 
 export const LotCodeModal: React.FC<LotCodeModalProps> = ({
@@ -43,10 +50,10 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [mode, setMode] = useState<LotAgentMode>("act");
+  const [autoApply, setAutoApply] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [generatedDiffs, setGeneratedDiffs] = useState<Array<{ filePath: string; diff: string }>>([]);
-  const [activeDiffIndex, setActiveDiffIndex] = useState(0);
+  const [generatedDiffs, setGeneratedDiffs] = useState<DiffBlock[]>([]);
 
   // Virtual Project Files
   const [files, setFiles] = useState<Record<string, string>>({
@@ -94,6 +101,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
         body: JSON.stringify({
           prompt,
           mode,
+          autoApply,
           workspaceFiles: files,
         }),
       });
@@ -124,12 +132,18 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
               } else if (event.type === "tool_call" || event.type === "tool_result") {
                 addLog({ type: "tool", message: event.message });
               } else if (event.type === "diff_generated" && event.diffBlock) {
-                setGeneratedDiffs((prev) => [...prev, event.diffBlock]);
+                const block: DiffBlock = event.diffBlock;
+                setGeneratedDiffs((prev) => [...prev, block]);
                 addLog({
                   type: "diff",
                   message: event.message,
-                  diffBlock: event.diffBlock,
+                  diffBlock: block,
                 });
+                // Auto-apply mode: the agent already changed its own workspace and told
+                // us this diff needs no approval, so mirror it into the local files.
+                if (block.requiresApproval === false && block.applied) {
+                  setFiles((prev) => ({ ...prev, [block.filePath]: block.diff }));
+                }
               } else if (event.type === "verification") {
                 addLog({ type: "verification", message: event.message });
               } else if (event.type === "done") {
@@ -169,27 +183,49 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
             </div>
           </div>
 
-          {/* Mode Selector */}
-          <div className="flex items-center space-x-1.5 p-1 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs">
-            {(["act", "plan", "audit"] as LotAgentMode[]).map((m) => {
-              const active = mode === m;
-              return (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  disabled={isRunning}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                    active
-                      ? "bg-zinc-800 text-white border border-zinc-700"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-                  }`}
-                >
-                  {m === "act" && "Act"}
-                  {m === "plan" && "Plan"}
-                  {m === "audit" && "Audit"}
-                </button>
-              );
-            })}
+          <div className="flex items-center space-x-3">
+            {/* Mode Selector */}
+            <div className="flex items-center space-x-1.5 p-1 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs">
+              {(["act", "plan", "audit"] as LotAgentMode[]).map((m) => {
+                const active = mode === m;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    disabled={isRunning}
+                    title={LOT_MODES[m].description}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                      active
+                        ? "bg-zinc-800 text-white border border-zinc-700"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    {m === "act" && "Build"}
+                    {m === "plan" && "Plan"}
+                    {m === "audit" && "Audit"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Auto-apply toggle — only meaningful when the mode can write */}
+            <button
+              onClick={() => setAutoApply((v) => !v)}
+              disabled={isRunning || !LOT_MODES[mode].allowFileWrite}
+              title={
+                LOT_MODES[mode].allowFileWrite
+                  ? "When on, the agent applies changes automatically. When off, you approve each diff."
+                  : "This mode is read-only, so nothing is applied."
+              }
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                autoApply && LOT_MODES[mode].allowFileWrite
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                  : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200"
+              } ${!LOT_MODES[mode].allowFileWrite ? "opacity-40 cursor-not-allowed" : ""}`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>{autoApply ? "Auto-apply on" : "Approve each change"}</span>
+            </button>
           </div>
 
           {/* Close button */}
@@ -323,6 +359,7 @@ export const LotCodeModal: React.FC<LotCodeModalProps> = ({
                     key={idx}
                     filePath={diffItem.filePath}
                     diffText={diffItem.diff}
+                    preApplied={diffItem.requiresApproval === false && diffItem.applied === true}
                     onApply={(path, newContent) => {
                       setFiles((prev) => ({ ...prev, [path]: newContent }));
                     }}

@@ -36,10 +36,12 @@ class ResponseCache {
 
   public set(query: string, model: string, content: string, hero?: any): void {
     const key = this.normalizeKey(query, model);
-    if (this.cache.size >= this.maxEntries) {
+    // Only evict when this write actually adds an entry.
+    if (!this.cache.has(key) && this.cache.size >= this.maxEntries) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) this.cache.delete(oldestKey);
     }
+    this.cache.delete(key);
     this.cache.set(key, {
       content,
       hero,

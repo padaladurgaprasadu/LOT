@@ -101,9 +101,31 @@ export class AgentOrchestrator {
   public async dispatch(req: OrchestratorRequest): Promise<OrchestratorResponse> {
     const domain = req.domainOverride || this.classifyDomain(req.query);
 
+    // The CODE domain writes to the workspace, so its permission tier must be settled
+    // BEFORE it runs. Previously the agent executed first and the HITL gate was consulted
+    // afterwards, so "requiresHitlApproval: true" was reported on work already done.
+    const requiredTier: OperationTier = domain === "CODE" || domain === "GENERAL" ? "WRITE" : "READ";
+
+    if (requiredTier !== "READ") {
+      const preflight = hitlGate.evaluate(requiredTier, req.contextFiles?.[0] || "workspace", {
+        command: undefined,
+      });
+      if (!preflight.allowed) {
+        return {
+          domain,
+          agentName: this.getAgentDisplayName(domain),
+          result: {
+            pending: true,
+            message: `This ${domain} operation modifies the workspace and needs your approval before it runs.`,
+          },
+          requiresHitlApproval: true,
+          hitlRequestId: preflight.requestId,
+          executionTimestamp: Date.now(),
+        };
+      }
+    }
+
     let result: any = null;
-    let requiredTier: OperationTier = "READ";
-    let targetEntity = domain;
 
     switch (domain) {
       case "SILICON": {
@@ -138,24 +160,15 @@ export class AgentOrchestrator {
       case "CODE":
       default: {
         result = await lotCodeAgent.execute({ instruction: req.query, files: req.contextFiles });
-        requiredTier = "WRITE";
-        targetEntity = (result.modifiedFiles && result.modifiedFiles[0]) || "workspace";
         break;
       }
     }
-
-    // Evaluate Human-in-the-Loop Security Gate
-    const permission = hitlGate.evaluate(requiredTier, targetEntity, {
-      diff: result.diffs,
-      command: undefined,
-    });
 
     return {
       domain,
       agentName: this.getAgentDisplayName(domain),
       result,
-      requiresHitlApproval: permission.requiresApproval,
-      hitlRequestId: permission.requestId,
+      requiresHitlApproval: false,
       executionTimestamp: Date.now(),
     };
   }

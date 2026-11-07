@@ -42,6 +42,10 @@ yarn-error.log*
 # Sovereign PRISM Hardware IP Vault (Hidden from public Git until Patent Grant)
 hardware/prism/
 PRISM_*.md
+PRISM_*.pdf
+PRISM_*.png
 prism_*.jpg
+prism_*.py
+prism_*.html
 GOVERNMENT_SUBMISSION_DOSSIER.md
 

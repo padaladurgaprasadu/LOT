@@ -279,45 +279,61 @@ export class LotCodeWorkspace {
       const searchReplaceRegex = /<<<<<<< SEARCH\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> REPLACE/g;
       let updatedContent = originalContent;
       let appliedBlocks = 0;
+      let totalBlocks = 0;
       let match: RegExpExecArray | null;
 
       while ((match = searchReplaceRegex.exec(diffText)) !== null) {
         const searchBlock = match[1];
         const replaceBlock = match[2];
 
-        if (updatedContent.includes(searchBlock)) {
-          updatedContent = updatedContent.replace(searchBlock, replaceBlock);
+        totalBlocks++;
+        const index = updatedContent.indexOf(searchBlock);
+        if (index !== -1) {
+          // String.replace treats $&, $1, $' etc. in the replacement as substitution
+          // patterns, silently corrupting any code that contains them. Splice manually.
+          updatedContent =
+            updatedContent.slice(0, index) + replaceBlock + updatedContent.slice(index + searchBlock.length);
           appliedBlocks++;
         }
       }
 
-      if (appliedBlocks > 0 || !originalContent) {
-        this.history.push({
-          timestamp: Date.now(),
-          path: cleanPath,
-          previousContent: originalContent,
-        });
-        const finalContent = appliedBlocks > 0 ? updatedContent : diffText;
-        this.setFile(cleanPath, finalContent);
+      // Previously, when no SEARCH block matched an empty file, the raw diff text
+      // (conflict markers and all) was written out as the file's contents.
+      if (appliedBlocks === 0) {
         return {
           filePath: cleanPath,
-          success: true,
-          appliedLines: appliedBlocks,
-          rejectedLines: 0,
-          newContent: finalContent,
+          success: false,
+          appliedLines: 0,
+          rejectedLines: totalBlocks,
+          error:
+            totalBlocks === 0
+              ? "No valid SEARCH/REPLACE blocks found in the patch."
+              : `None of the ${totalBlocks} SEARCH block(s) matched the current contents of ${cleanPath}.`,
         };
       }
+
+      this.history.push({
+        timestamp: Date.now(),
+        path: cleanPath,
+        previousContent: originalContent,
+      });
+      this.setFile(cleanPath, updatedContent);
+      return {
+        filePath: cleanPath,
+        success: true,
+        appliedLines: appliedBlocks,
+        rejectedLines: totalBlocks - appliedBlocks,
+        newContent: updatedContent,
+      };
     }
 
     // 2. Standard Unified Diff Chunk Application
     const diffLines = diffText.split("\n");
-    let inHunk = false;
-    const newLines: string[] = [];
-    let applied = 0;
 
     const isUnifiedDiff = diffLines.some((l) => l.startsWith("@@") || l.startsWith("---") || l.startsWith("+++"));
 
     if (!isUnifiedDiff) {
+      // Not a diff at all — treat the payload as the file's full new contents.
       this.history.push({
         timestamp: Date.now(),
         path: cleanPath,
@@ -333,31 +349,109 @@ export class LotCodeWorkspace {
       };
     }
 
-    for (const line of diffLines) {
-      if (line.startsWith("---") || line.startsWith("+++") || line.startsWith("diff --git")) {
-        continue;
-      }
-      if (line.startsWith("@@")) {
-        inHunk = true;
-        continue;
-      }
-      if (!inHunk) continue;
+    return this.applyUnifiedDiff(cleanPath, originalContent, diffLines);
+  }
 
-      if (line.startsWith("+")) {
-        newLines.push(line.slice(1));
-        applied++;
-      } else if (line.startsWith("-")) {
-        applied++;
-      } else if (line.startsWith(" ")) {
-        newLines.push(line.slice(1));
-      } else if (line.trim() === "") {
-        newLines.push("");
-      } else {
-        newLines.push(line);
+  /**
+   * Applies unified-diff hunks onto the original file at the line offsets each
+   * `@@ -start,count +start,count @@` header declares.
+   *
+   * The previous implementation rebuilt the file from the hunk bodies alone, so
+   * patching two lines of a 500-line file replaced the whole file with those two
+   * lines and everything outside the hunks was destroyed.
+   */
+  private applyUnifiedDiff(cleanPath: string, originalContent: string, diffLines: string[]): PatchResult {
+    const originalLines = originalContent === "" ? [] : originalContent.split("\n");
+    const output: string[] = [];
+    let cursor = 0; // index into originalLines already copied to output
+    let applied = 0;
+    let rejected = 0;
+    let sawHunk = false;
+
+    let i = 0;
+    while (i < diffLines.length) {
+      const line = diffLines[i];
+
+      const hunkHeader = line.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+      if (!hunkHeader) {
+        i++;
+        continue;
+      }
+
+      sawHunk = true;
+      const oldStart = Math.max(0, parseInt(hunkHeader[1], 10) - 1);
+      const oldCount = hunkHeader[2] === undefined ? 1 : parseInt(hunkHeader[2], 10);
+
+      // Collect this hunk's body.
+      const body: string[] = [];
+      i++;
+      while (i < diffLines.length && !/^@@\s+-\d+/.test(diffLines[i])) {
+        const bodyLine = diffLines[i];
+        if (
+          bodyLine.startsWith("--- ") ||
+          bodyLine.startsWith("+++ ") ||
+          bodyLine.startsWith("diff --git") ||
+          bodyLine.startsWith("index ") ||
+          bodyLine.startsWith("\\ No newline")
+        ) {
+          i++;
+          continue;
+        }
+        body.push(bodyLine);
+        i++;
+      }
+
+      // Hunks must be applied in ascending order; a header pointing behind the cursor
+      // (or past the end of the file) cannot be placed safely.
+      if (oldStart < cursor || oldStart > originalLines.length) {
+        rejected += body.filter((b) => b.startsWith("+") || b.startsWith("-")).length;
+        continue;
+      }
+
+      // Copy the untouched region between the last hunk and this one.
+      output.push(...originalLines.slice(cursor, oldStart));
+      cursor = oldStart;
+
+      let consumed = 0;
+      for (const bodyLine of body) {
+        if (bodyLine.startsWith("+")) {
+          output.push(bodyLine.slice(1));
+          applied++;
+        } else if (bodyLine.startsWith("-")) {
+          // Skip the corresponding original line.
+          consumed++;
+          applied++;
+        } else {
+          // Context line (leading space, or a bare line some generators emit).
+          const text = bodyLine.startsWith(" ") ? bodyLine.slice(1) : bodyLine;
+          output.push(text);
+          consumed++;
+        }
+      }
+
+      // Advance past what this hunk covered, bounded by the header's declared count
+      // so a malformed body cannot swallow the rest of the file.
+      cursor = Math.min(originalLines.length, cursor + Math.max(consumed, 0));
+      if (oldCount > 0 && cursor < oldStart + oldCount) {
+        output.push(...originalLines.slice(cursor, Math.min(originalLines.length, oldStart + oldCount)));
+        cursor = Math.min(originalLines.length, oldStart + oldCount);
       }
     }
 
-    const reconstructed = newLines.join("\n");
+    if (!sawHunk) {
+      return {
+        filePath: cleanPath,
+        success: false,
+        appliedLines: 0,
+        rejectedLines: 0,
+        error: "Patch contained diff headers but no @@ hunks.",
+      };
+    }
+
+    // Everything after the final hunk is preserved verbatim.
+    output.push(...originalLines.slice(cursor));
+
+    const reconstructed = output.join("\n");
     this.history.push({
       timestamp: Date.now(),
       path: cleanPath,
@@ -367,9 +461,9 @@ export class LotCodeWorkspace {
 
     return {
       filePath: cleanPath,
-      success: true,
+      success: rejected === 0,
       appliedLines: applied,
-      rejectedLines: 0,
+      rejectedLines: rejected,
       newContent: reconstructed,
     };
   }
