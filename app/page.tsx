@@ -799,6 +799,8 @@ export default function Home() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        activeMode={activeMode}
+        onSelectMode={handleSelectMode}
         conversations={conversations}
         activeConvId={activeConvId}
         onSelectConversation={handleSelectConversation}

@@ -15,12 +15,20 @@ import {
   Puzzle,
   ChevronDown,
   ChevronUp,
+  Cpu,
+  Code2,
+  Bot,
+  Headphones,
+  GraduationCap,
 } from "lucide-react";
 import { Conversation, UserProfile } from "@/lib/types";
+import { LotOsMode, LOT_OS_MODES } from "@/lib/lot-os/types";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  activeMode?: LotOsMode;
+  onSelectMode?: (mode: LotOsMode) => void;
   conversations: Conversation[];
   activeConvId: string | null;
   onSelectConversation: (id: string) => void;
@@ -36,9 +44,62 @@ interface SidebarProps {
   userProfile: UserProfile;
 }
 
+const MODE_ICON_MAP: Record<LotOsMode, React.ComponentType<{ className?: string }>> = {
+  chat: MessageSquare,
+  pcb: Cpu,
+  app: Code2,
+  agent: Bot,
+  meeting: Headphones,
+  academic: GraduationCap,
+};
+
+const MODE_COLOR_MAP: Record<
+  LotOsMode,
+  { text: string; bg: string; border: string; dot: string }
+> = {
+  chat: {
+    text: "text-blue-400",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/40",
+    dot: "bg-blue-400",
+  },
+  pcb: {
+    text: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/40",
+    dot: "bg-amber-400",
+  },
+  app: {
+    text: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/40",
+    dot: "bg-emerald-400",
+  },
+  agent: {
+    text: "text-purple-400",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/40",
+    dot: "bg-purple-400",
+  },
+  meeting: {
+    text: "text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/40",
+    dot: "bg-rose-400",
+  },
+  academic: {
+    text: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/40",
+    dot: "bg-cyan-400",
+  },
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
+  activeMode = "chat",
+  onSelectMode,
   conversations,
   activeConvId,
   onSelectConversation,
@@ -93,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Sidebar Shell */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-black border-r border-[#1a1a1d] flex flex-col transition-transform duration-200 ease-in-out shadow-2xl ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#09090b] border-r border-[#1a1a1d] flex flex-col transition-transform duration-200 ease-in-out shadow-2xl ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -106,30 +167,93 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.25)] contrast-125 brightness-110"
               loading="eager"
             />
-            <span className="text-base font-bold tracking-tight text-white font-sans">LOT AI</span>
+            <span className="text-base font-bold tracking-tight text-white font-sans">
+              LOT AI
+            </span>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
-            title="Toggle Sidebar"
+            title="Close Sidebar"
           >
             <PanelLeft className="w-4 h-4 text-zinc-300" />
           </button>
         </div>
 
-        {/* Vertical Actions: New Chat, Projects, Schedule Tasks, Meeting Intelligence, Skills & Plugins */}
-        <div className="px-3 py-2 space-y-1">
+        {/* Top Action: New Chat */}
+        <div className="px-3 pt-3 pb-1">
           <button
             onClick={onNewChat}
-            className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-200 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
+            className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-200 hover:text-white bg-[#141417]/80 hover:bg-[#1a1a1f] border border-zinc-800/80 hover:border-zinc-700 rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
           >
             <SquarePen className="w-4 h-4 text-white" />
             <span>New chat</span>
           </button>
+        </div>
 
+        {/* LOT-OS Multi-Agent Workspaces (Features requested in Side Panel) */}
+        <div className="px-3 py-2 border-b border-[#1a1a1d]">
+          <div className="px-2 mb-2 flex items-center justify-between text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
+            <span>OS Workspaces</span>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              LOT-OS
+            </span>
+          </div>
+          <div className="space-y-1">
+            {LOT_OS_MODES.map((modeMeta) => {
+              const Icon = MODE_ICON_MAP[modeMeta.id] || Sparkles;
+              const isActive = activeMode === modeMeta.id;
+              const color = MODE_COLOR_MAP[modeMeta.id];
+
+              return (
+                <button
+                  key={modeMeta.id}
+                  onClick={() => {
+                    if (onSelectMode) {
+                      onSelectMode(modeMeta.id);
+                    }
+                    onClose();
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98] group ${
+                    isActive
+                      ? `${color.bg} ${color.text} border ${color.border} shadow-[0_0_12px_rgba(0,0,0,0.5)] font-semibold`
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#141417] border border-transparent"
+                  }`}
+                  title={modeMeta.description}
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <Icon
+                      className={`w-4 h-4 shrink-0 transition-colors ${
+                        isActive
+                          ? color.text
+                          : "text-zinc-500 group-hover:text-zinc-300"
+                      }`}
+                    />
+                    <span className="truncate">{modeMeta.label}</span>
+                  </div>
+                  {isActive ? (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${color.dot} shadow-[0_0_8px_currentColor]`}
+                    />
+                  ) : (
+                    <span className="text-[10px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Open
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tools & Management */}
+        <div className="px-3 py-2 border-b border-[#1a1a1d] space-y-1">
+          <div className="px-2 mb-1.5 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
+            Tools
+          </div>
           <button
             onClick={onOpenProjects}
-            className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
+            className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
           >
             <Layers className="w-4 h-4 text-zinc-400" />
             <span>Projects</span>
@@ -137,26 +261,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={onOpenScheduleTasks}
-            className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
+            className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
           >
             <CalendarClock className="w-4 h-4 text-zinc-400" />
             <span>Schedule tasks</span>
           </button>
 
-          {onOpenMeetingAssistant && (
-            <button
-              onClick={onOpenMeetingAssistant}
-              className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
-            >
-              <FileText className="w-4 h-4 text-blue-400" />
-              <span>Meeting Intelligence</span>
-            </button>
-          )}
-
           {onOpenSkillsMarketplace && (
             <button
               onClick={onOpenSkillsMarketplace}
-              className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
+              className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
             >
               <Puzzle className="w-4 h-4 text-emerald-400" />
               <span>Skills & Plugins</span>
@@ -247,7 +361,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="w-full mt-2.5 flex items-center justify-center space-x-1.5 px-3 py-2 text-xs text-zinc-400 hover:text-white bg-[#121215] hover:bg-[#18181c] border border-zinc-800/80 rounded-xl transition-all duration-150 active:scale-[0.98]"
                 >
                   <span className="font-medium">
-                    {showAllHistory ? "Show Less" : `View More (${remainingCount} older)`}
+                    {showAllHistory
+                      ? "Show Less"
+                      : `View More (${remainingCount} older)`}
                   </span>
                   {showAllHistory ? (
                     <ChevronUp className="w-3.5 h-3.5 text-zinc-400" />
@@ -263,7 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Section: User Profile Details */}
         <div className="p-3 border-t border-[#1a1a1d] bg-black">
           <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#121215] transition-all duration-150">
-            <div 
+            <div
               onClick={onOpenAuth}
               className="flex items-center space-x-2.5 min-w-0 flex-1 cursor-pointer"
             >
@@ -272,10 +388,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-xs font-medium text-zinc-200 truncate">
-                  {userProfile.isLoggedIn ? (userProfile.name || "User") : (userProfile.name || "Guest User")}
+                  {userProfile.isLoggedIn
+                    ? userProfile.name || "User"
+                    : userProfile.name || "Guest User"}
                 </span>
                 <span className="text-[10px] text-blue-400 font-medium truncate">
-                  {userProfile.isLoggedIn ? userProfile.email : "24h Free Preview • Sign In"}
+                  {userProfile.isLoggedIn
+                    ? userProfile.email
+                    : "24h Free Preview • Sign In"}
                 </span>
               </div>
             </div>
