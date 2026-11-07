@@ -243,6 +243,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               );
             })}
+
+            {/* Direct Access to Standalone Swarm Studio */}
+            <a
+              href="/agent-swarm"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-indigo-300 hover:text-white bg-indigo-950/20 hover:bg-indigo-950/50 border border-indigo-900/50 transition-all duration-150 active:scale-[0.98] group mt-1.5"
+            >
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <Layers className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span className="truncate font-semibold">Coding Swarm Studio</span>
+              </div>
+              <span className="text-[10px] text-indigo-400 font-mono">Launch &rarr;</span>
+            </a>
           </div>
         </div>
 
