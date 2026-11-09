@@ -1,10 +1,32 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Mic, MicOff, ArrowUp, Square, Paperclip, Sparkles, X, FileCode, ImageIcon, Music, Globe, Code2, Cpu, Newspaper, Check } from "lucide-react";
+import {
+  Plus,
+  Mic,
+  MicOff,
+  ArrowUp,
+  Square,
+  Paperclip,
+  Sparkles,
+  X,
+  FileCode,
+  ImageIcon,
+  Music,
+  Globe,
+  Code2,
+  Cpu,
+  Newspaper,
+  Check,
+  Bot,
+  GraduationCap,
+  Terminal,
+  MessageSquare,
+} from "lucide-react";
 import { Attachment, IndustryFocus } from "@/lib/types";
+import { LotOsMode } from "@/lib/lot-os/types";
 
-interface ChatInputProps {
+export interface ChatInputProps {
   onSendMessage: (message: string, attachment?: Attachment, searchFocus?: IndustryFocus) => void;
   isLoading: boolean;
   onStopGeneration?: () => void;
@@ -13,7 +35,24 @@ interface ChatInputProps {
   externalInput?: string;
   searchFocus?: IndustryFocus;
   onSearchFocusChange?: (focus: IndustryFocus) => void;
+  activeMode?: string;
+  onSelectMode?: (mode: string) => void;
 }
+
+interface ModePill {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const MODE_PILLS: ModePill[] = [
+  { id: "chat", label: "Chat", icon: <MessageSquare className="w-3 h-3 text-blue-400" /> },
+  { id: "app", label: "App Preview", icon: <Code2 className="w-3 h-3 text-emerald-400" /> },
+  { id: "pcb", label: "PCB EDA", icon: <Cpu className="w-3 h-3 text-purple-400" /> },
+  { id: "academic", label: "Academic", icon: <GraduationCap className="w-3 h-3 text-amber-400" /> },
+  { id: "agent", label: "Action", icon: <Bot className="w-3 h-3 text-cyan-400" /> },
+  { id: "python", label: "Python", icon: <Terminal className="w-3 h-3 text-rose-400" /> },
+];
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
@@ -24,6 +63,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   externalInput,
   searchFocus = "all",
   onSearchFocusChange,
+  activeMode = "chat",
+  onSelectMode,
 }) => {
   const [input, setInput] = useState("");
   const [internalFocus, setInternalFocus] = useState<IndustryFocus>(searchFocus);
@@ -31,6 +72,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<string>(activeMode);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -38,6 +81,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const baseInputRef = useRef<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  useEffect(() => {
+    if (activeMode) {
+      setSelectedMode(activeMode);
+    }
+  }, [activeMode]);
 
   // Sync external input and focus
   useEffect(() => {
@@ -51,7 +100,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [externalInput]);
 
-  // Clean auto-resize without layout repaint flashing
+  // Clean auto-resize without layout repaint flashing (24px to 160px)
   useEffect(() => {
     const el = textareaRef.current;
     if (el) {
@@ -98,102 +147,88 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // 1. Web Speech API (Continuous 100% full phrase streaming)
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-
-      recognition.onstart = () => {
-        isListeningRef.current = true;
-        setIsListening(true);
-      };
-
-      recognition.onresult = (event: any) => {
-        let finalTranscript = "";
-        let interimTranscript = "";
-
-        for (let i = 0; i < event.results.length; ++i) {
-          const res = event.results[i];
-          if (res.isFinal) {
-            finalTranscript += res[0].transcript + " ";
-          } else {
-            interimTranscript += res[0].transcript;
-          }
-        }
-
-        const liveSpeech = (finalTranscript + interimTranscript).trim();
-        const base = baseInputRef.current.trim();
-        setInput(base ? `${base} ${liveSpeech}` : liveSpeech);
-      };
-
-      recognition.onerror = (event: any) => {
-        if (event.error !== "no-speech") {
-          console.warn("Speech recognition notice:", event.error);
-        }
-      };
-
-      recognition.onend = () => {
-        // Auto-restart if user has not explicitly clicked stop
-        if (isListeningRef.current) {
-          try {
-            recognition.start();
-          } catch {}
-        } else {
-          setIsListening(false);
-        }
-      };
-
-      recognitionRef.current = recognition;
       try {
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => {
+          isListeningRef.current = true;
+          setIsListening(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          let liveTranscript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            liveTranscript += event.results[i][0].transcript;
+          }
+          const base = baseInputRef.current;
+          setInput(base ? `${base} ${liveTranscript}` : liveTranscript);
+        };
+
+        recognition.onerror = (err: any) => {
+          console.warn("Speech recognition error:", err);
+          if (err.error === "not-allowed") {
+            isListeningRef.current = false;
+            setIsListening(false);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListeningRef.current) {
+            try {
+              recognition.start();
+            } catch {}
+          }
+        };
+
         recognition.start();
-        isListeningRef.current = true;
-        setIsListening(true);
         return;
       } catch (err) {
-        console.warn("Direct speech recognition start failed, falling back to Whisper recorder:", err);
+        console.warn("Native speech init failed, falling back to MediaRecorder Whisper:", err);
       }
     }
 
-    // 2. Continuous MediaRecorder + OpenAI Whisper fallback
+    // 2. Whisper Fallback via MediaRecorder
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
-        setIsTranscribing(true);
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("audio", audioBlob, "voice_input.webm");
-
-        try {
-          const res = await fetch("/api/whisper", {
-            method: "POST",
-            body: formData,
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.text) {
-              const base = baseInputRef.current.trim();
-              setInput(base ? `${base} ${data.text}` : data.text);
+        if (audioBlob.size > 1000) {
+          setIsTranscribing(true);
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "recording.webm");
+          try {
+            const res = await fetch("/api/whisper", {
+              method: "POST",
+              body: formData,
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.text) {
+                setInput((prev) => (prev ? `${prev} ${data.text}` : data.text));
+              }
             }
+          } catch (e) {
+            console.error("Whisper fallback transcription failed:", e);
+          } finally {
+            setIsTranscribing(false);
           }
-        } catch (err) {
-          console.error("Whisper transcription error:", err);
-        } finally {
-          setIsTranscribing(false);
-          stream.getTracks().forEach((track) => track.stop());
         }
       };
 
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
+      recorder.start();
       isListeningRef.current = true;
       setIsListening(true);
     } catch (err) {
@@ -284,8 +319,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const handlePillClick = (modeId: string) => {
+    setSelectedMode(modeId);
+    if (onSelectMode) {
+      onSelectMode(modeId);
+    }
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 pb-2 sm:pb-3 pb-safe">
+      {/* Multi-Mode Selector Pills (Chat, App Preview, PCB EDA, Academic, Action, Python) */}
+      <div className="mb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
+        {MODE_PILLS.map((pill) => {
+          const isActive = selectedMode === pill.id;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => handlePillClick(pill.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-150 shrink-0 ${
+                isActive
+                  ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
+                  : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80 hover:border-zinc-700/80"
+              }`}
+            >
+              {pill.icon}
+              <span>{pill.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Attachment Preview Card if image attached */}
       {attachment && (
         <div className="mb-2 flex items-center space-x-2 bg-[#141417] border border-zinc-800 rounded-xl p-2 max-w-xs animate-in fade-in duration-100">
@@ -501,7 +565,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               ? "Whisper is transcribing audio..."
               : isListening
               ? "Listening continuously... speak freely"
-              : "Ask LOT anything..."
+              : `Ask LOT anything (${MODE_PILLS.find((p) => p.id === selectedMode)?.label || "Chat"} mode)...`
           }
           rows={1}
           className="flex-1 bg-transparent border-0 resize-none text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-0 text-sm leading-relaxed px-2 py-1 max-h-[160px] custom-scrollbar font-sans"
@@ -559,3 +623,5 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     </div>
   );
 };
+
+export default ChatInput;

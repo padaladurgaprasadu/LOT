@@ -1,427 +1,387 @@
-import { NextRequest, NextResponse } from "next/server";
-import crypto from "node:crypto";
-import dns from "node:dns";
-import https from "node:https";
-import { LOT_SYSTEM_PROMPT, DEFAULT_MODEL_ID } from "@/lib/nvidia";
-import { checkRateLimit } from "@/lib/rateLimiter";
-import { verifyJwt } from "@/lib/auth";
-import { resolveEntityHero } from "@/lib/entityHero";
-import { globalResponseCache } from "@/lib/responseCache";
-import { analyzeQuery } from "@/lib/queryRouter";
-import { performLiveWebSearch, requiresWebSearch } from "@/lib/webSearch";
-import { streamFromGroq } from "@/lib/groq";
-import { AGENTIC_CODING_SYSTEM_DIRECTIVES } from "@/lib/agent/codingDirectives";
+/**
+ * LOT Unified Chat & Execution API Gateway Route (app/api/chat/route.ts)
+ *
+ * Implements Milestone 4 (R4):
+ * Unifies all platform and intelligence subsystems into a single deterministic,
+ * zero-crash production endpoint:
+ * 1. Resilient Input Parsing & Validation:
+ *    - Validates JSON payload, detects malformed JSON and empty objects/arrays (HTTP 400).
+ * 2. Platform Services Integration:
+ *    - Session verification via `verifySession(request)`.
+ *    - Sliding-window rate limiting via `checkRateLimit(session.sessionId, 30, 60000)`.
+ *    - HTTP 429 with standard headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`).
+ * 3. Query Intent Classification:
+ *    - Deterministic sub-millisecond classification across 8 intents via `classifyQueryIntent`.
+ * 4. Verified Live Web Grounding:
+ *    - Multi-source grounding (Jina, Google News, Wikipedia) via `performWebGrounding`.
+ * 5. Multi-Provider Failover Rotation:
+ *    - Automatic rotation across NVIDIA NIM -> Groq -> OpenRouter -> Sovereign Zero-Key fallback.
+ *    - Zero HTTP 500 guarantee even when API keys are absent or providers fail.
+ * 6. Artifact & Action Extraction:
+ *    - Self-contained React artifacts, structured PCB JSON, and autonomous action payloads.
+ * 7. Deterministic Response:
+ *    - Clean JSON response or Server-Sent Events stream with session and rate-limit headers.
+ */
 
-// 1. Enforce IPv4-first to eliminate DNS/NAT64 handshake latency
-dns.setDefaultResultOrder("ipv4first");
+import { NextResponse } from "next/server";
+import { verifySession, SessionContext } from "@/lib/platform/auth";
+import { checkRateLimit, getRateLimitHeaders, RateLimitResult } from "@/lib/platform/rateLimiter";
+import { classifyQueryIntent, IntentClassification, QueryIntent } from "@/lib/intelligence/queryRouter";
+import { performWebGrounding, WebSearchResult } from "@/lib/intelligence/webSearch";
+import {
+  executeModelWithFailover,
+  synthesizeLocalDiagnostic,
+  ModelResponse,
+} from "@/lib/intelligence/modelRotation";
+import {
+  extractReactArtifact,
+  extractPcbSpecification,
+  extractAutonomousAction,
+  ReactAppArtifact,
+  PcbSpecification,
+  AutonomousActionPayload,
+} from "@/lib/agents/lotCodeEngine";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// 4. Reduce network hops: Persistent Keep-Alive Socket Pool with 0ms connection reuse
-const httpsAgent = new https.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 120000,
-  maxSockets: 100,
-  maxFreeSockets: 50,
-  timeout: 30000,
-});
-
-async function streamFromNvidia(
-  model: string,
-  messages: any[],
-  apiKey: string,
-  onChunk: (chunk: Buffer) => void,
-  onDelta: (text: string) => void,
-  timeoutMs = 4500
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const postData = JSON.stringify({
-      model,
-      messages,
-      temperature: 0.6,
-      top_p: 0.9,
-      max_tokens: 4096,
-      stream: true,
-    });
-
-    let completed = false;
-
-    const req = https.request(
-      {
-        hostname: "integrate.api.nvidia.com",
-        port: 443,
-        path: "/v1/chat/completions",
-        method: "POST",
-        agent: httpsAgent,
-        family: 4,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Length": Buffer.byteLength(postData),
-          Connection: "keep-alive",
-        },
-      },
-      (res) => {
-        if (res.statusCode && res.statusCode >= 400) {
-          let errBody = "";
-          res.on("data", (d) => (errBody += d));
-          res.on("end", () => {
-            completed = true;
-            reject(new Error(`HTTP ${res.statusCode}: ${errBody}`));
-          });
-          return;
-        }
-
-        res.on("data", (chunk: Buffer) => {
-          onChunk(chunk);
-          const chunkStr = chunk.toString();
-          const lines = chunkStr.split("\n");
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith("data:") && trimmed !== "data: [DONE]") {
-              try {
-                const parsed = JSON.parse(trimmed.replace(/^data:\s*/, ""));
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) onDelta(delta);
-              } catch {}
-            }
-          }
-        });
-
-        res.on("end", () => {
-          completed = true;
-          resolve();
-        });
-
-        res.on("error", (err) => {
-          if (!completed) {
-            completed = true;
-            reject(err);
-          }
-        });
-      }
-    );
-
-    req.setTimeout(timeoutMs, () => {
-      req.destroy(new Error(`Timeout after ${timeoutMs}ms`));
-    });
-
-    req.on("error", (err) => {
-      if (!completed) {
-        completed = true;
-        reject(err);
-      }
-    });
-
-    req.write(postData);
-    req.end();
-  });
+export interface ChatApiRequest {
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  sessionId?: string;
+  model?: string;
+  modelOverride?: string;
+  mode?: string;
+  enableGrounding?: boolean;
+  stream?: boolean;
+  customPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
 }
 
-export async function POST(req: NextRequest) {
+export interface ChatApiResponse {
+  message: string;
+  intent: QueryIntent;
+  modelUsed: string;
+  provider: string;
+  searchResults?: WebSearchResult[];
+  artifacts?: {
+    reactApp?: ReactAppArtifact | null;
+    pcbSpec?: PcbSpecification | null;
+    autonomousAction?: AutonomousActionPayload | null;
+  };
+}
+
+/**
+ * GET /api/chat
+ * Deterministically returns 405 Method Not Allowed
+ */
+export async function GET(): Promise<Response> {
+  return NextResponse.json(
+    { error: "Method Not Allowed. Use POST /api/chat." },
+    { status: 405, headers: { Allow: "POST" } }
+  );
+}
+
+/**
+ * POST /api/chat
+ * Unified zero-crash chat & execution endpoint
+ */
+export async function POST(req: Request): Promise<Response> {
   const reqStart = Date.now();
+
   try {
-    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "anonymous";
-    const rateCheck = checkRateLimit(`chat_${ip}`, 120, 60 * 1000);
-    if (!rateCheck.allowed) {
+    // 1. Input Handling & Resilience
+    let rawText: string;
+    try {
+      rawText = await req.text();
+    } catch {
       return NextResponse.json(
-        { error: `Rate limit reached. Please wait ${rateCheck.resetInSec}s.` },
-        { status: 429 }
-      );
-    }
-
-    // 1. Token Verification (Logged In vs. 24-Hour Free Guest Trial)
-    const token = req.cookies.get("lot_session_token")?.value;
-    const session = token ? verifyJwt(token) : null;
-    let guestCookieToSet: string | null = null;
-
-    if (!session) {
-      const guestCookie = req.cookies.get("lot_guest_session_start")?.value;
-      const now = Date.now();
-      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-
-      if (!guestCookie) {
-        // First-time guest: initialize 24-hour trial
-        guestCookieToSet = String(now);
-      } else {
-        const guestStartTime = parseInt(guestCookie, 10);
-        if (isNaN(guestStartTime) || now - guestStartTime > TWENTY_FOUR_HOURS) {
-          return NextResponse.json(
-            { error: "Your 24-hour free guest preview has expired. Please sign in or create a free account to continue." },
-            { status: 401 }
-          );
-        }
-      }
-    }
-
-    const { messages, customPrompt, attachment, searchFocus = "all" } = await req.json();
-
-    // A malformed body previously reached `messages[messages.length - 1]` and threw a
-    // TypeError, which surfaced to the user as a generic 500.
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: "`messages` must be a non-empty array." },
+        { error: "Invalid JSON payload" },
         { status: 400 }
       );
     }
-    for (const m of messages) {
+
+    if (!rawText || !rawText.trim()) {
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        { status: 400 }
+      );
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(rawText);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        { status: 400 }
+      );
+    }
+
+    // Check for empty body object {} or non-object payload
+    if (!body || typeof body !== "object" || Object.keys(body).length === 0) {
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        { status: 400 }
+      );
+    }
+
+    // Validate messages array (must have at least 1 message)
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return NextResponse.json(
+        { error: "Invalid messages payload: messages must be a non-empty array" },
+        { status: 400 }
+      );
+    }
+
+    for (const m of body.messages) {
       if (!m || typeof m !== "object" || typeof m.role !== "string" || typeof m.content !== "string") {
         return NextResponse.json(
-          { error: "Each message must have a string `role` and string `content`." },
+          { error: "Each message must have a string role and string content" },
           { status: 400 }
         );
       }
     }
-    if (customPrompt !== undefined && typeof customPrompt !== "string") {
-      return NextResponse.json({ error: "`customPrompt` must be a string." }, { status: 400 });
-    }
 
-    const activeApiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
-    if (!activeApiKey) {
+    // 2. Platform Services Integration: Auth Session Verification & Rate Limiting
+    const session: SessionContext = await verifySession(req);
+    const sessionId =
+      req.headers.get("x-session-id") ||
+      req.headers.get("x-lot-session-id") ||
+      body.sessionId ||
+      session.sessionId;
+
+    // Sliding-window rate limit: 30 requests per 60,000ms
+    const rateLimit: RateLimitResult = checkRateLimit(sessionId, 30, 60000);
+    const rateHeaders = getRateLimitHeaders(rateLimit);
+
+    if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Server API Key is not configured in .env.local." },
-        { status: 500 }
+        { error: "Rate limit exceeded" },
+        {
+          status: 429,
+          headers: {
+            ...rateHeaders,
+            "X-Session-Id": sessionId,
+          },
+        }
       );
     }
 
-    const lastUserMessage = (messages[messages.length - 1]?.content || "").trim();
+    // 3. Intent Classification
+    const rawMessages: Array<{ role: string; content: string }> = body.messages;
+    const lastUserMsg = [...rawMessages].reverse().find((m) => m.role === "user")?.content || "";
+    const query = typeof lastUserMsg === "string" ? lastUserMsg.trim() : "";
+    const mode = typeof body.mode === "string" ? body.mode : undefined;
 
-    // 2. Autonomous Dynamic Auto-Routing (Sub-450ms Ultra-Speed Model)
-    let targetModel = "nvidia/nemotron-3-nano-30b-a3b";
-    if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
-      targetModel = "meta/muse-glimmer-30b";
-    } else {
-      targetModel = "nvidia/nemotron-3-nano-30b-a3b";
+    const intentClassification: IntentClassification = classifyQueryIntent(query, mode);
+
+    // 4. Verified Live Web Grounding
+    let searchResults: WebSearchResult[] = [];
+    const shouldGround = intentClassification.requiresWebSearch || body.enableGrounding === true;
+    if (shouldGround && query) {
+      try {
+        searchResults = await performWebGrounding(query);
+      } catch (groundingErr) {
+        console.warn("[LOT CHAT] Grounding search failed gracefully:", groundingErr);
+        searchResults = [];
+      }
     }
 
-    // The cache was keyed on (last user message, model) only. Two users asking the same
-    // question got the same cached answer even when one of them had a custom project
-    // system prompt or a different search vertical — leaking one user's tailored answer
-    // to another. Scope the key to everything that changes the response.
-    const promptScope = crypto
-      .createHash("sha256")
-      .update(typeof customPrompt === "string" ? customPrompt : LOT_SYSTEM_PROMPT)
-      .digest("hex")
-      .slice(0, 16);
-    const cacheScope = `${targetModel}|${searchFocus}|${promptScope}`;
+    // Append formatted grounding snippets to LLM context with sources and citations
+    const modelMessages: Array<{ role: string; content: string }> = [];
 
-    // 3. In-Memory LRU Cache Hit (Pillar 3: Add Caching, < 2ms instant response)
-    if (!attachment && messages.length <= 2 && lastUserMessage) {
-      const cached = globalResponseCache.get(lastUserMessage, cacheScope);
-      if (cached) {
-        const encoder = new TextEncoder();
-        const cachedStream = new ReadableStream({
-          async start(controller) {
-            if (cached.hero) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ hero: cached.hero })}\n\n`));
-            }
-            const chunkSize = 24;
-            for (let i = 0; i < cached.content.length; i += chunkSize) {
-              const chunk = cached.content.slice(i, i + chunkSize);
+    if (body.customPrompt && typeof body.customPrompt === "string") {
+      modelMessages.push({
+        role: "system",
+        content: body.customPrompt,
+      });
+    }
+
+    if (searchResults && searchResults.length > 0) {
+      const groundingSnippet = searchResults
+        .map(
+          (res, idx) =>
+            `[Source ${idx + 1} (${res.source})]: ${res.title}\nURL: ${res.url}\n${res.snippet}`
+        )
+        .join("\n\n");
+
+      modelMessages.push({
+        role: "system",
+        content: `[VERIFIED REAL-TIME GROUNDING FOR: "${query}"]:\n${groundingSnippet}\n\nUse the above verified live search data as authoritative ground truth. Include source citations where relevant.`,
+      });
+    }
+
+    modelMessages.push(...rawMessages);
+
+    // 5. Multi-Provider Failover Rotation
+    let modelResponse: ModelResponse;
+    try {
+      modelResponse = await executeModelWithFailover(modelMessages, {
+        preferredModel: body.model || body.modelOverride,
+        temperature: typeof body.temperature === "number" ? body.temperature : undefined,
+        maxTokens: typeof body.maxTokens === "number" ? body.maxTokens : undefined,
+      });
+    } catch (execErr) {
+      console.warn("[LOT CHAT] Remote failover error, synthesizing local sovereign response:", execErr);
+      modelResponse = synthesizeLocalDiagnostic(modelMessages, {
+        preferredModel: body.model || body.modelOverride,
+      });
+    }
+
+    // 6. Artifact & Action Extraction
+    let reactApp: ReactAppArtifact | null = null;
+    let pcbSpec: PcbSpecification | null = null;
+    let autonomousAction: AutonomousActionPayload | null = null;
+
+    try {
+      reactApp = extractReactArtifact(modelResponse.content);
+    } catch (e) {
+      console.warn("[LOT CHAT] React artifact extraction error:", e);
+    }
+
+    try {
+      pcbSpec = extractPcbSpecification(modelResponse.content);
+    } catch (e) {
+      console.warn("[LOT CHAT] PCB spec extraction error:", e);
+    }
+
+    try {
+      autonomousAction = extractAutonomousAction(modelResponse.content);
+    } catch (e) {
+      console.warn("[LOT CHAT] Autonomous action extraction error:", e);
+    }
+
+    const artifacts = {
+      reactApp: reactApp || null,
+      pcbSpec: pcbSpec || null,
+      autonomousAction: autonomousAction || null,
+    };
+
+    // 7. Deterministic Response Construction
+    const responseHeaders: Record<string, string> = {
+      ...rateHeaders,
+      "X-Session-Id": sessionId,
+      "X-LOT-Model": modelResponse.modelUsed,
+      "X-LOT-Provider": modelResponse.provider,
+      "X-LOT-Intent": intentClassification.intent,
+      "X-LOT-Latency-Ms": String(Date.now() - reqStart),
+    };
+
+    const isStreaming = body.stream === true || req.headers.get("accept") === "text/event-stream";
+
+    if (isStreaming) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            // Emit metadata
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "metadata",
+                  intent: intentClassification.intent,
+                  model: modelResponse.modelUsed,
+                  provider: modelResponse.provider,
+                  searchResults: searchResults || [],
+                })}\n\n`
+              )
+            );
+
+            // Emit actionCard if present
+            if (autonomousAction) {
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: chunk } }] })}\n\n`)
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "actionCard",
+                    actionCard: autonomousAction,
+                  })}\n\n`
+                )
               );
-              await new Promise((r) => setTimeout(r, 2));
             }
+
+            // Stream content chunks
+            const content = modelResponse.content;
+            const chunkSize = 24;
+            for (let i = 0; i < content.length; i += chunkSize) {
+              const chunk = content.slice(i, i + chunkSize);
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    choices: [{ delta: { content: chunk } }],
+                  })}\n\n`
+                )
+              );
+            }
+
+            // Emit artifacts
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "artifacts",
+                  artifacts,
+                })}\n\n`
+              )
+            );
+
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
-          },
-        });
+          } catch (streamErr) {
+            console.error("[LOT CHAT] Streaming pipeline error:", streamErr);
+            try {
+              controller.close();
+            } catch {}
+          }
+        },
+      });
 
-        const cachedHeaders: Record<string, string> = {
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          ...responseHeaders,
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
           "X-Accel-Buffering": "no",
-          "X-LOT-Cache": "HIT",
-          "X-Response-Time": `${Date.now() - reqStart}ms`,
-        };
-        if (guestCookieToSet) {
-          cachedHeaders["Set-Cookie"] = `lot_guest_session_start=${guestCookieToSet}; Path=/; Max-Age=${24 * 60 * 60}; SameSite=Lax; HttpOnly`;
-        }
-
-        return new Response(cachedStream, {
-          headers: cachedHeaders,
-        });
-      }
-    }
-
-    // 4. Parallel Non-Blocking Pre-flight Resolution (Pillar 4: Reduce Network Hops)
-    const analysis = analyzeQuery(lastUserMessage, !!attachment);
-    const shouldSearch = searchFocus !== "all" || requiresWebSearch(lastUserMessage);
-    const [resolvedHero, webGrounding] = await Promise.all([
-      analysis.requiresHero && lastUserMessage ? resolveEntityHero(lastUserMessage) : Promise.resolve(null),
-      shouldSearch ? performLiveWebSearch(lastUserMessage, searchFocus) : Promise.resolve(null),
-    ]);
-
-    // 5. Build Formatted Context with Authoritative Temporal Ground Truth
-    const now = new Date();
-    const currentDateFormatted = now.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      timeZone: "Asia/Kolkata",
-    });
-    const currentUtcString = now.toUTCString();
-
-    let baseSystemPrompt = customPrompt || LOT_SYSTEM_PROMPT;
-    baseSystemPrompt += `\n\n[AUTHORITATIVE SERVER CLOCK & TEMPORAL CONTEXT]:\nToday's Date: ${currentDateFormatted} (UTC: ${currentUtcString})\nCurrent Year: ${now.getFullYear()}\nCRITICAL RULE: When asked for today's date, day, month, year, or current time, ALWAYS answer with this exact date (${currentDateFormatted}). Never hallucinate a past or future date.\n\n[CRITICAL LANGUAGE ALIGNMENT DIRECTIVE]:\nYou MUST respond in the EXACT SAME LANGUAGE and SCRIPT as the user's latest message.\n- If the user wrote in English (e.g. "Hello", "Hi", "Tell me about X"), you MUST reply in pure, natural English. Do NOT reply in Telugu or any other language unless the user wrote in Telugu or explicitly asked for it.\n- Only reply in Telugu/Hindi/etc. if the user's message itself is in that language or explicitly requests a translation.`;
-
-    if (searchFocus === "dev") {
-      baseSystemPrompt += `\n\n[VERTICAL FOCUS: DEVELOPER & CODE SPECS]:\nPrioritize official documentation, GitHub repositories, RFCs, and StackOverflow specs. Provide strictly typed, complete code with zero placeholders.`;
-    } else if (searchFocus === "hardware") {
-      baseSystemPrompt += `\n\n[VERTICAL FOCUS: HARDWARE & SILICON INTELLIGENCE]:\nPrioritize IEEE papers, TSMC/NVIDIA whitepapers, chip datasheets, and physical semiconductor microarchitecture metrics (FLOPs/W, SRAM bandwidth, die layouts).`;
-    } else if (searchFocus === "news") {
-      baseSystemPrompt += `\n\n[VERTICAL FOCUS: LIVE NEWS & 2026 EVENT STREAM]:\nFocus strictly on real-time 2026 breaking news and verified current event timelines.`;
-    }
-
-    if (analysis.intent === "code_synthesis") {
-      baseSystemPrompt += `\n\n${AGENTIC_CODING_SYSTEM_DIRECTIVES}`;
-    }
-    if (webGrounding) {
-      baseSystemPrompt += `\n\n[VERIFIED REAL-TIME GROUNDING]:\n${webGrounding}\n\nCRITICAL DIRECTIVE: The current year is 2026. You have active real-time web access. Use the above verified live search data as ground truth. If the search data is broad or partial, synthesize with your expert engineering knowledge to provide the exact, accurate answer and official URLs (e.g. https://github.com/atopile/atopile for PCB compiler, KiCad, OpenROAD). NEVER output meta-commentary like "Based on Source 1 / Source 2, none of the sources mention..." Answer directly, authoritatively, and accurately.`;
-    }
-
-    let formattedMessages: any[] = [
-      {
-        role: "system",
-        content: baseSystemPrompt,
-      },
-    ];
-
-    if (attachment && attachment.dataUrl && attachment.type.startsWith("image/")) {
-      formattedMessages.push({
-        role: "user",
-        content: [
-          { type: "text", text: lastUserMessage || "Analyze this image." },
-          { type: "image_url", image_url: { url: attachment.dataUrl } },
-        ],
+        },
       });
-    } else {
-      const leanHistory = messages.slice(-8);
-      const processedHistory = leanHistory.map((m: { role: string; content: string }, idx: number) => {
-        // Inject live data context into the active user query
-        if (idx === leanHistory.length - 1 && m.role === "user" && webGrounding) {
-          return {
-            role: "user",
-            content: `${m.content}\n\n[LIVE SEARCH DATA]:\n${webGrounding}`,
-          };
-        }
-        return {
-          role: m.role,
-          content: m.content,
-        };
-      });
-
-      formattedMessages = [
-        ...formattedMessages,
-        ...processedHistory,
-      ];
     }
 
-    // 6. Dual-Stream Controller with Self-Healing Fallback
-    let collectedFullResponse = "";
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-
-        // Guaranteed Chunk 0 Hero visual metadata
-        if (resolvedHero) {
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ hero: resolvedHero })}\n\n`));
-          } catch {}
-        }
-
-        try {
-          await streamFromNvidia(
-            targetModel,
-            formattedMessages,
-            activeApiKey,
-            (chunk) => controller.enqueue(chunk),
-            (delta) => (collectedFullResponse += delta),
-            12000
-          );
-        } catch (primaryErr: any) {
-          // 1. First Fallback: Ultra-fast Groq LPU if GROQ_API_KEY is configured
-          const groqKey = process.env.GROQ_API_KEY;
-          let recovered = false;
-          if (groqKey && !attachment) {
-            try {
-              await streamFromGroq(
-                "llama-3.3-70b-versatile",
-                formattedMessages,
-                groqKey,
-                (chunk) => controller.enqueue(chunk),
-                (delta) => (collectedFullResponse += delta),
-                8000
-              );
-              // Previously `return`ed here, which skipped the [DONE] sentinel and
-              // controller.close() below — the client stream never terminated and the
-              // UI hung on "generating" forever after a successful Groq fallback.
-              recovered = true;
-            } catch (groqErr) {
-              console.error("[LOT CHAT] Groq fallback failed:", groqErr);
-            }
-          }
-
-          // 2. Second Fallback: Secondary NVIDIA model
-          if (!recovered && targetModel !== "meta/llama-3.2-11b-vision-instruct" && !attachment) {
-            try {
-              await streamFromNvidia(
-                "meta/llama-3.2-11b-vision-instruct",
-                formattedMessages,
-                activeApiKey,
-                (chunk) => controller.enqueue(chunk),
-                (delta) => (collectedFullResponse += delta),
-                8000
-              );
-            } catch (fallbackErr: any) {
-              console.error("[LOT CHAT] all providers failed:", fallbackErr);
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ The model is temporarily unavailable. Please try again.` } }] })}\n\n`)
-              );
-            }
-          } else if (!recovered) {
-            console.error("[LOT CHAT] primary provider failed with no usable fallback:", primaryErr);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n⚠️ The model is temporarily unavailable. Please try again.` } }] })}\n\n`)
-            );
-          }
-        }
-
-        // 5. Async Caching (Pillar 5: Async everything - off the critical streaming path)
-        // Web-grounded answers embed live search results and a server timestamp, so
-        // caching them for 24h served stale "current" facts to later requests.
-        if (lastUserMessage && collectedFullResponse && !webGrounding && !attachment) {
-          globalResponseCache.set(lastUserMessage, cacheScope, collectedFullResponse, resolvedHero);
-        }
-
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        try {
-          controller.close();
-        } catch {}
-      },
-    });
-
-    const streamHeaders: Record<string, string> = {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-      "X-LOT-Model": targetModel,
-      "X-LOT-Cache": "MISS",
+    // Clean JSON Response
+    const responsePayload: ChatApiResponse = {
+      message: modelResponse.content,
+      intent: intentClassification.intent,
+      modelUsed: modelResponse.modelUsed,
+      provider: modelResponse.provider,
+      searchResults: searchResults || [],
+      artifacts,
     };
-    if (guestCookieToSet) {
-      streamHeaders["Set-Cookie"] = `lot_guest_session_start=${guestCookieToSet}; Path=/; Max-Age=${24 * 60 * 60}; SameSite=Lax; HttpOnly`;
-    }
 
-    return new Response(stream, {
-      headers: streamHeaders,
+    return NextResponse.json(responsePayload, {
+      status: 200,
+      headers: responseHeaders,
     });
-  } catch (err: any) {
-    console.error("[LOT CHAT] request failed:", err);
-    return NextResponse.json({ error: "Failed to process chat request." }, { status: 500 });
+  } catch (fatalErr: any) {
+    console.error("[LOT CHAT] Fatal error trapped gracefully:", fatalErr);
+
+    // Guaranteed zero-500 response
+    const fallback = synthesizeLocalDiagnostic([{ role: "user", content: "System Recovery" }]);
+    return NextResponse.json(
+      {
+        message: fallback.content,
+        intent: "CHAT",
+        modelUsed: fallback.modelUsed,
+        provider: fallback.provider,
+        searchResults: [],
+        artifacts: { reactApp: null, pcbSpec: null, autonomousAction: null },
+      },
+      {
+        status: 200,
+        headers: {
+          "X-Session-Id": "sess_fallback",
+          "X-LOT-Provider": "sovereign",
+        },
+      }
+    );
   }
 }

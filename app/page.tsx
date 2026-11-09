@@ -5,8 +5,8 @@ import dynamic from "next/dynamic";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { DiffViewer } from "../components/DiffViewer";
-import { CognitiveStream } from "../components/chat/CognitiveStream";
-import { WorkspaceErrorBoundary } from "../components/workspaces/WorkspaceErrorBoundary";
+import { CognitiveStream } from "../components/CognitiveStream";
+import { WorkspaceErrorBoundary } from "../components/canvases/WorkspaceErrorBoundary";
 import { ScheduleTasksModal } from "../components/ScheduleTasksModal";
 import { ProjectsModal } from "../components/ProjectsModal";
 import { AuthModal } from "../components/AuthModal";
@@ -73,7 +73,7 @@ function CanvasLoadingSkeleton({ title }: { title: string }) {
 
 // SSR-Safe Dynamic Imports for All 5 Workspace Canvases
 const AppPreviewCanvas = dynamic(
-  () => import("../components/workspaces/AppPreviewCanvas"),
+  () => import("../components/canvases/AppPreviewCanvas"),
   {
     ssr: false,
     loading: () => <CanvasLoadingSkeleton title="Loading App Sandbox & Android Mockup..." />,
@@ -81,7 +81,7 @@ const AppPreviewCanvas = dynamic(
 );
 
 const PcbHardwareCanvas = dynamic(
-  () => import("../components/workspaces/PcbHardwareCanvas"),
+  () => import("../components/canvases/PcbHardwareCanvas"),
   {
     ssr: false,
     loading: () => <CanvasLoadingSkeleton title="Loading TSCircuit 2D/3D Hardware Engine..." />,
@@ -89,15 +89,15 @@ const PcbHardwareCanvas = dynamic(
 );
 
 const AutonomousActionCard = dynamic(
-  () => import("../components/workspaces/AutonomousActionCard"),
+  () => import("../components/canvases/AutonomousActionCard"),
   {
     ssr: false,
     loading: () => <CanvasLoadingSkeleton title="Loading ReAct Timeline & HITL Gate..." />,
   }
 );
 
-const MeetingCopilotHud = dynamic(
-  () => import("../components/workspaces/MeetingCopilotHud"),
+const MeetingAssistant = dynamic(
+  () => import("../components/canvases/MeetingAssistant"),
   {
     ssr: false,
     loading: () => <CanvasLoadingSkeleton title="Loading Meeting Co-pilot Audio HUD..." />,
@@ -105,7 +105,7 @@ const MeetingCopilotHud = dynamic(
 );
 
 const AcademicCanvas = dynamic(
-  () => import("../components/workspaces/AcademicCanvas"),
+  () => import("../components/canvases/AcademicCanvas"),
   {
     ssr: false,
     loading: () => <CanvasLoadingSkeleton title="Loading KaTeX & ArXiv Research Canvas..." />,
@@ -550,8 +550,8 @@ export default function Home() {
     }
 
     try {
-      // Primary: Route to /api/lot-os; Fallback: Route to /api/chat
-      let response: Response | null = await fetch("/api/lot-os", {
+      // Connect exclusively to unified /api/chat endpoint
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -559,33 +559,14 @@ export default function Home() {
             role: m.role,
             content: m.content,
           })),
-          mode: activeMode,
-          modelOverride: selectedModel,
           model: selectedModel,
+          mode: activeMode,
           customPrompt,
           attachment,
           searchFocus: activeFocus,
         }),
         signal: controller.signal,
-      }).catch(() => null);
-
-      if (!response || !response.ok) {
-        response = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [...currentConv.messages, userMessage].map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-            model: selectedModel,
-            customPrompt,
-            attachment,
-            searchFocus: activeFocus,
-          }),
-          signal: controller.signal,
-        });
-      }
+      });
 
       if (response.status === 401) {
         setAuthOpen(true);
@@ -625,6 +606,46 @@ export default function Home() {
             // Direct ActionCard payload from server
             if (data.actionCard) {
               setCurrentCanvasPayload(data.actionCard);
+              setActiveMode("agent");
+              setIsCanvasVisible(true);
+            }
+
+            // Artifacts extraction payload from server
+            if (data.artifacts) {
+              if (data.artifacts.reactApp) {
+                const code = data.artifacts.reactApp.sanitizedCode || data.artifacts.reactApp.code;
+                setCurrentCanvasPayload({ code, files: { "/App.js": code } });
+                setActiveMode("app");
+                setIsCanvasVisible(true);
+              } else if (data.artifacts.pcbSpec) {
+                setCurrentCanvasPayload(data.artifacts.pcbSpec);
+                setActiveMode("pcb");
+                setIsCanvasVisible(true);
+              } else if (data.artifacts.autonomousAction) {
+                setCurrentCanvasPayload(data.artifacts.autonomousAction);
+                setActiveMode("agent");
+                setIsCanvasVisible(true);
+              }
+            }
+
+            // Dynamic Intent Routing from server
+            if (data.intent) {
+              if (data.intent === "APP_PREVIEW") {
+                setActiveMode("app");
+                setIsCanvasVisible(true);
+              } else if (data.intent === "PCB_HARDWARE") {
+                setActiveMode("pcb");
+                setIsCanvasVisible(true);
+              } else if (data.intent === "AUTONOMOUS_ACTION") {
+                setActiveMode("agent");
+                setIsCanvasVisible(true);
+              } else if (data.intent === "MEETING_ASSISTANT") {
+                setActiveMode("meeting");
+                setIsCanvasVisible(true);
+              } else if (data.intent === "ACADEMIC_RESEARCH") {
+                setActiveMode("academic");
+                setIsCanvasVisible(true);
+              }
             }
 
             const delta = data.choices?.[0]?.delta;
@@ -704,6 +725,28 @@ export default function Home() {
         setStoredConversations(next);
         return next;
       });
+
+      // Auto-extract and activate matching canvas if not set by explicit event
+      const finalClean = streamedRaw.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
+      if (finalClean) {
+        if (/function\s+App\s*\(|export\s+default\s+function\s+App/i.test(finalClean)) {
+          const codeMatch = finalClean.match(/```(?:jsx|tsx|javascript|typescript|react)?\s*([\s\S]*?)```/i);
+          const rawCode = codeMatch ? codeMatch[1].trim() : finalClean;
+          setCurrentCanvasPayload({ code: rawCode, files: { "/App.js": rawCode } });
+          setActiveMode("app");
+          setIsCanvasVisible(true);
+        } else if (/<board|<resistor|<capacitor|@tscircuit/i.test(finalClean)) {
+          const pcbMatch = finalClean.match(/```(?:tsx|jsx|typescript)?\s*([\s\S]*?)```/i);
+          const pcbCode = pcbMatch ? pcbMatch[1].trim() : finalClean;
+          setCurrentCanvasPayload({ circuitCode: pcbCode });
+          setActiveMode("pcb");
+          setIsCanvasVisible(true);
+        } else if (/biryani|swiggy|zomato/i.test(finalClean) && /order|status|dispatch/i.test(finalClean)) {
+          setCurrentCanvasPayload({ type: "food", service: "food_ordering" });
+          setActiveMode("agent");
+          setIsCanvasVisible(true);
+        }
+      }
     } catch (err: any) {
       if (err.name === "AbortError") {
         console.log("Generation stopped by user");
@@ -756,7 +799,7 @@ export default function Home() {
         );
       case "meeting":
         return (
-          <MeetingCopilotHud
+          <MeetingAssistant
             activeMode={activeMode}
             currentPayload={currentCanvasPayload}
             onAction={(act, data) => console.log("Meeting Action:", act, data)}

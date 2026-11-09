@@ -121,3 +121,6 @@ export function setStoredTasks(tasks: ScheduledTask[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(KEYS.TASKS, JSON.stringify(tasks));
 }
+
+// Re-export Platform Storage for backward compatibility
+export * from "./platform/storage";
