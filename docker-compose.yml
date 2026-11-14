@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # LiteLLM Multi-Key Gateway & Flagship Model Matrix Proxy
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: lot-litellm-gateway
+    restart: unless-stopped
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./infra/litellm/litellm_config.yaml:/app/config.yaml:ro
+      - ./infra/litellm/nim_guardrail_hook.py:/app/nim_guardrail_hook.py:ro
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-lot-master-admin-key-flagship-mesh}
+      - NVIDIA_NIM_API_KEY_1=${NVIDIA_NIM_API_KEY_1:-}
+      - NVIDIA_NIM_API_KEY_2=${NVIDIA_NIM_API_KEY_2:-}
+      - NVIDIA_NIM_API_KEY_3=${NVIDIA_NIM_API_KEY_3:-}
+      - NVIDIA_NIM_API_KEY_4=${NVIDIA_NIM_API_KEY_4:-}
+      - NVIDIA_NIM_API_KEY_5=${NVIDIA_NIM_API_KEY_5:-}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - lot-network
+
+  # Qdrant 4096-Dimensional Vector & Graph Memory Storage
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: lot-qdrant-memory
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-lot-qdrant-secure-local-key}
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c 'cat < /dev/null > /dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lot-network
+
+  # Redis Rate Limiting, Semantic Caching & Cooldown State
+  redis:
+    image: redis:7-alpine
+    container_name: lot-redis-cache
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - lot-network
+
+  # SearXNG Metasearch Engine for Zero-404 Grounding
+  searxng:
+    image: searxng/searxng:latest
+    container_name: lot-searxng-engine
+    restart: unless-stopped
+    ports:
+      - "${SEARXNG_PORT:-8080}:8080"
+    volumes:
+      - ./infra/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:${SEARXNG_PORT:-8080}
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-lot-searxng-secret-token-key-2026}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/healthz || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lot-network
+
+  # LOT AIOS Micro-Kernel Backend Engine
+  lot-kernel:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lot-aios-kernel
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - PORT=8000
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-lot-master-admin-key-flagship-mesh}
+      - QDRANT_HOST=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-lot-qdrant-secure-local-key}
+      - REDIS_URL=redis://redis:6379/0
+      - SEARXNG_URL=http://searxng:8080
+      - HIGGSFIELD_API_KEY=${HIGGSFIELD_API_KEY:-hf-cluster-flagship-gpu-media-key-2026}
+      - HIGGSFIELD_BASE_URL=${HIGGSFIELD_BASE_URL:-https://api.higgsfield.ai}
+      - LOT_AFFILIATE_TAG=${LOT_AFFILIATE_TAG:-?ref=LOT_AIOS_AFFILIATE}
+    depends_on:
+      - litellm
+      - qdrant
+      - redis
+      - searxng
+    networks:
+      - lot-network
+
+networks:
+  lot-network:
+    name: lot-aios-net
+    driver: bridge
+
+volumes:
+  qdrant_data:
+    name: lot_qdrant_data
+  redis_data:
+    name: lot_redis_data

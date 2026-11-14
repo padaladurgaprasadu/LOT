@@ -1,0 +1,72 @@
+# ==============================================================================
+# SearXNG Configuration for LOT AIOS Zero-404 Grounding Pipeline
+# ==============================================================================
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "LOT AIOS Zero-404 Engine"
+  donation_url: false
+  contact_url: false
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "lot-searxng-secret-token-key-2026"
+  base_url: "http://localhost:8080"
+  image_proxy: true
+  method: "POST"
+
+search:
+  safe_search: 0
+  autocomplete: "google"
+  default_lang: "en"
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  formats:
+    - html
+    - json
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    timeout: 3.0
+    disabled: false
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    timeout: 3.0
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: b
+    timeout: 3.0
+    disabled: false
+
+  - name: brave
+    engine: brave
+    shortcut: br
+    timeout: 3.0
+    disabled: false
+
+  - name: github
+    engine: github
+    shortcut: gh
+    timeout: 3.0
+    disabled: false
+
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+    timeout: 4.0
+    disabled: false
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: w
+    timeout: 3.0
+    disabled: false

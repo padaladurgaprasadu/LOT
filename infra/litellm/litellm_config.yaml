@@ -1,0 +1,211 @@
+# ==============================================================================
+# LiteLLM Configuration: 100% Frontier Heavyweight NIM Model Matrix Proxy
+# Enforces Zero Lightweight / Edge Quantized / Micro Models (< 250B)
+# ==============================================================================
+
+model_list:
+  # ----------------------------------------------------------------------------
+  # 1. Moonshot Kimi-K3.1-Pro (2.8T) — Daily Chat & Vision Agent
+  # ----------------------------------------------------------------------------
+  - model_name: kimi-k3.1-pro
+    litellm_params:
+      model: openai/moonshotai/kimi-k3.1-pro
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_1
+      rpm: 1000
+      tpm: 500000
+  - model_name: kimi-k3.1-pro
+    litellm_params:
+      model: openai/moonshotai/kimi-k3.1-pro
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_2
+      rpm: 1000
+      tpm: 500000
+  - model_name: moonshot/kimi-k3.1-pro
+    litellm_params:
+      model: openai/moonshotai/kimi-k3.1-pro
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_1
+
+  # ----------------------------------------------------------------------------
+  # 2. DeepSeek-V4-Pro / DeepSeek-R1 (1.6T / 671B) — SWE, Coding & PCB Synthesis
+  # ----------------------------------------------------------------------------
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: openai/deepseek-ai/deepseek-v4-pro
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_2
+      rpm: 1200
+      tpm: 600000
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: openai/deepseek-ai/deepseek-v4-pro
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_3
+      rpm: 1200
+      tpm: 600000
+  - model_name: deepseek-ai/deepseek-v4-pro
+    litellm_params:
+      model: openai/deepseek-ai/deepseek-v4-pro
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_2
+
+  - model_name: deepseek-r1
+    litellm_params:
+      model: openai/deepseek-ai/deepseek-r1
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_2
+  - model_name: deepseek-ai/deepseek-r1
+    litellm_params:
+      model: openai/deepseek-ai/deepseek-r1
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_3
+
+  # ----------------------------------------------------------------------------
+  # 3. Mistral Large 4 (1.0T) — Visual DOM & Multimodal Agent
+  # ----------------------------------------------------------------------------
+  - model_name: mistral-large-4-1t
+    litellm_params:
+      model: openai/mistralai/mistral-large-4-1t
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_3
+      rpm: 1000
+      tpm: 500000
+  - model_name: mistral-large-4-1t
+    litellm_params:
+      model: openai/mistralai/mistral-large-4-1t
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_4
+      rpm: 1000
+      tpm: 500000
+  - model_name: mistralai/mistral-large-4-1t
+    litellm_params:
+      model: openai/mistralai/mistral-large-4-1t
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_3
+
+  # ----------------------------------------------------------------------------
+  # 4. Z-AI GLM-5.3 (753B) — Terminal & Tool Planning Agent
+  # ----------------------------------------------------------------------------
+  - model_name: glm-5.3
+    litellm_params:
+      model: openai/z-ai/glm-5.3
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_4
+      rpm: 1500
+      tpm: 750000
+  - model_name: glm-5.3
+    litellm_params:
+      model: openai/z-ai/glm-5.3
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+      rpm: 1500
+      tpm: 750000
+  - model_name: z-ai/glm-5.3
+    litellm_params:
+      model: openai/z-ai/glm-5.3
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_4
+
+  # ----------------------------------------------------------------------------
+  # 5. NVIDIA Nemotron-3-Ultra (550B) — AIOS Planner & Research Agent
+  # ----------------------------------------------------------------------------
+  - model_name: nemotron-3-ultra-550b
+    litellm_params:
+      model: openai/nvidia/nemotron-3-ultra-550b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+      rpm: 1000
+      tpm: 500000
+  - model_name: nemotron-3-ultra-550b
+    litellm_params:
+      model: openai/nvidia/nemotron-3-ultra-550b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_1
+      rpm: 1000
+      tpm: 500000
+  - model_name: nvidia/nemotron-3-ultra-550b
+    litellm_params:
+      model: openai/nvidia/nemotron-3-ultra-550b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+
+  # ----------------------------------------------------------------------------
+  # 6. NVIDIA Llama-3.1-Nemotron-Ultra-253B (253B) — Mathematical Verification
+  # ----------------------------------------------------------------------------
+  - model_name: llama-3.1-nemotron-ultra-253b
+    litellm_params:
+      model: openai/nvidia/llama-3.1-nemotron-ultra-253b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_1
+      rpm: 1200
+      tpm: 600000
+  - model_name: llama-3.1-nemotron-ultra-253b
+    litellm_params:
+      model: openai/nvidia/llama-3.1-nemotron-ultra-253b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_2
+      rpm: 1200
+      tpm: 600000
+  - model_name: nvidia/llama-3.1-nemotron-ultra-253b
+    litellm_params:
+      model: openai/nvidia/llama-3.1-nemotron-ultra-253b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_1
+
+  # ----------------------------------------------------------------------------
+  # 7. Dense Embeddings & Reranking (4096-dimensional vectors)
+  # ----------------------------------------------------------------------------
+  - model_name: nemotron-3.5-embed-8b
+    litellm_params:
+      model: openai/nvidia/nemotron-3.5-embed-8b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+      dimensions: 4096
+  - model_name: nvidia/nemotron-3.5-embed-8b
+    litellm_params:
+      model: openai/nvidia/nemotron-3.5-embed-8b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+      dimensions: 4096
+
+  - model_name: nemotron-3.5-rerank-8b
+    litellm_params:
+      model: openai/nvidia/nemotron-3.5-rerank-8b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+  - model_name: nvidia/nemotron-3.5-rerank-8b
+    litellm_params:
+      model: openai/nvidia/nemotron-3.5-rerank-8b
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: os.environ/NVIDIA_NIM_API_KEY_5
+
+# Router & Cooldown Policy
+router_settings:
+  routing_strategy: usage-based-routing-v2
+  cooldown_time: 60
+  num_retries: 3
+  timeout: 120
+  allowed_fails: 2
+  fallbacks:
+    - kimi-k3.1-pro: ["nemotron-3-ultra-550b", "deepseek-v4-pro"]
+    - deepseek-v4-pro: ["deepseek-r1", "llama-3.1-nemotron-ultra-253b"]
+    - deepseek-r1: ["deepseek-v4-pro", "llama-3.1-nemotron-ultra-253b"]
+    - mistral-large-4-1t: ["kimi-k3.1-pro", "nemotron-3-ultra-550b"]
+    - glm-5.3: ["nemotron-3-ultra-550b", "deepseek-v4-pro"]
+    - nemotron-3-ultra-550b: ["kimi-k3.1-pro", "deepseek-v4-pro"]
+    - llama-3.1-nemotron-ultra-253b: ["deepseek-r1", "nemotron-3-ultra-550b"]
+
+# Redis Cache Integration
+cache:
+  type: redis
+  host: os.environ/REDIS_HOST
+  port: os.environ/REDIS_PORT
+  ttl: 86400
+
+# General LiteLLM Settings & Hooks
+litellm_settings:
+  callbacks: ["nim_guardrail_hook.NIMFlagshipGuardrailHook"]
+  drop_params: true
+  json_logs: true
+  set_verbose: false

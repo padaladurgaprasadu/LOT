@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "node tests/e2e/run_all.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.109",
