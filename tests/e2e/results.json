@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-11-09T01:32:50.419Z",
-  "totalDurationMs": 31227,
+  "timestamp": "2026-11-14T03:13:14.575Z",
+  "totalDurationMs": 19594,
   "summary": {
     "total": 114,
     "passed": 114,
@@ -41,7 +41,7 @@
       "feature": "R1: Storage",
       "description": "saveSession persists a WorkspaceSession and getSession retrieves it",
       "status": "PASSED",
-      "durationMs": 10
+      "durationMs": 12
     },
     {
       "id": "T1_STORAGE_02",
@@ -49,7 +49,7 @@
       "feature": "R1: Storage",
       "description": "listSessions returns all stored sessions chronologically ordered",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1_STORAGE_03",
@@ -57,7 +57,7 @@
       "feature": "R1: Storage",
       "description": "compressSessionMemory retains system prompt, first user prompt, and recent turns",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1_STORAGE_04",
@@ -65,7 +65,7 @@
       "feature": "R1: Storage",
       "description": "clearAllSessions purges all workspace sessions",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_STORAGE_05",
@@ -73,7 +73,7 @@
       "feature": "R1: Storage",
       "description": "getSession returns null for nonexistent session ID without throwing",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1_AUTH_01",
@@ -81,7 +81,7 @@
       "feature": "R1: Auth",
       "description": "createAnonymousSession generates unique sessionId and valid token",
       "status": "PASSED",
-      "durationMs": 190
+      "durationMs": 18
     },
     {
       "id": "T1_AUTH_02",
@@ -97,7 +97,7 @@
       "feature": "R1: Auth",
       "description": "verifySession gracefully creates anonymous guest context when headers missing",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T1_AUTH_04",
@@ -105,7 +105,7 @@
       "feature": "R1: Auth",
       "description": "verifySession rejects tampered or invalid token gracefully",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_AUTH_05",
@@ -113,7 +113,7 @@
       "feature": "R1: Auth",
       "description": "verifySession preserves custom x-session-id header for guest tracking",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_RATELIMIT_01",
@@ -121,7 +121,7 @@
       "feature": "R1: RateLimiter",
       "description": "checkRateLimit permits initial request and reports remaining quota",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 7
     },
     {
       "id": "T1_RATELIMIT_02",
@@ -129,7 +129,7 @@
       "feature": "R1: RateLimiter",
       "description": "checkRateLimit decrements remaining quota on subsequent calls",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_RATELIMIT_03",
@@ -145,7 +145,7 @@
       "feature": "R1: RateLimiter",
       "description": "checkRateLimit resets window after windowMs elapses",
       "status": "PASSED",
-      "durationMs": 74
+      "durationMs": 69
     },
     {
       "id": "T1_RATELIMIT_05",
@@ -161,7 +161,7 @@
       "feature": "R2: QueryRouter",
       "description": "Classifies conversational query as CHAT",
       "status": "PASSED",
-      "durationMs": 25
+      "durationMs": 32
     },
     {
       "id": "T1_ROUTER_02",
@@ -177,7 +177,7 @@
       "feature": "R2: QueryRouter",
       "description": "Classifies hardware circuit query as PCB_HARDWARE",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T1_ROUTER_04",
@@ -225,7 +225,7 @@
       "feature": "R2: WebSearch",
       "description": "performWebGrounding executes grounding and returns results array",
       "status": "PASSED",
-      "durationMs": 22
+      "durationMs": 30
     },
     {
       "id": "T1_WEBSEARCH_02",
@@ -249,7 +249,7 @@
       "feature": "R2: WebSearch",
       "description": "performWebGrounding handles network 500 error gracefully without throwing",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T1_WEBSEARCH_05",
@@ -257,7 +257,7 @@
       "feature": "R2: WebSearch",
       "description": "Deduplicates multiple identical URLs from search sources",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T1_FAILOVER_01",
@@ -265,7 +265,7 @@
       "feature": "R2: ModelRotation",
       "description": "executeModelWithFailover succeeds with valid primary model response",
       "status": "PASSED",
-      "durationMs": 9
+      "durationMs": 10
     },
     {
       "id": "T1_FAILOVER_02",
@@ -289,7 +289,7 @@
       "feature": "R2: ModelRotation",
       "description": "Sets fallbackOccurred: true flag when secondary provider is used",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_FAILOVER_05",
@@ -297,7 +297,7 @@
       "feature": "R2: ModelRotation",
       "description": "Response conforms to ModelResponse contract schema",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T1_ENGINE_01",
@@ -305,7 +305,7 @@
       "feature": "R3: lotCodeEngine",
       "description": "extractReactArtifact parses React code fences and returns ReactAppArtifact",
       "status": "PASSED",
-      "durationMs": 24
+      "durationMs": 29
     },
     {
       "id": "T1_ENGINE_02",
@@ -321,7 +321,7 @@
       "feature": "R3: lotCodeEngine",
       "description": "extractPcbSpecification parses structured PCB JSON block",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 3
     },
     {
       "id": "T1_ENGINE_04",
@@ -329,7 +329,7 @@
       "feature": "R3: lotCodeEngine",
       "description": "extractAutonomousAction extracts structured service action payload",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 2
     },
     {
       "id": "T1_ENGINE_05",
@@ -345,7 +345,7 @@
       "feature": "R4: Chat API",
       "description": "POST /api/chat returns 200 with response payload for valid message",
       "status": "PASSED",
-      "durationMs": 585
+      "durationMs": 792
     },
     {
       "id": "T1_API_02",
@@ -353,7 +353,7 @@
       "feature": "R4: Chat API",
       "description": "POST /api/chat JSON payload includes message, intent, and modelUsed",
       "status": "PASSED",
-      "durationMs": 566
+      "durationMs": 329
     },
     {
       "id": "T1_API_03",
@@ -361,7 +361,7 @@
       "feature": "R4: Chat API",
       "description": "POST /api/chat enforces rate limiting when quota exceeded",
       "status": "PASSED",
-      "durationMs": 15681
+      "durationMs": 9358
     },
     {
       "id": "T1_API_04",
@@ -369,7 +369,7 @@
       "feature": "R4: Chat API",
       "description": "POST /api/chat attaches extracted artifacts on generation prompts",
       "status": "PASSED",
-      "durationMs": 6517
+      "durationMs": 807
     },
     {
       "id": "T1_API_05",
@@ -377,7 +377,7 @@
       "feature": "R4: Chat API",
       "description": "POST /api/chat respects sessionId header and links session",
       "status": "PASSED",
-      "durationMs": 1925
+      "durationMs": 6475
     },
     {
       "id": "T1_CANVAS_01",
@@ -385,7 +385,7 @@
       "feature": "R5: Canvases",
       "description": "AppPreviewCanvas file exists and defines isolated code preview",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 4
     },
     {
       "id": "T1_CANVAS_02",
@@ -401,7 +401,7 @@
       "feature": "R5: Canvases",
       "description": "AutonomousActionCard file exists and defines review & approval interface",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 2
     },
     {
       "id": "T1_CANVAS_04",
@@ -409,7 +409,7 @@
       "feature": "R5: Canvases",
       "description": "MeetingAssistant HUD file exists and defines transcript & agenda",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_CANVAS_05",
@@ -417,7 +417,7 @@
       "feature": "R5: Canvases",
       "description": "AcademicCanvas file exists and defines formula & citation explorer",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1_SHELL_01",
@@ -433,7 +433,7 @@
       "feature": "R6: Split-screen Shell",
       "description": "components/ChatInput.tsx defines multi-mode prompt bar with intent picker",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1_SHELL_03",
@@ -449,7 +449,7 @@
       "feature": "R6: Split-screen Shell",
       "description": "WorkspaceErrorBoundary isolates canvas runtime failures",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1_SHELL_05",
@@ -457,7 +457,7 @@
       "feature": "R6: Layout Compliance",
       "description": "Repository tree conforms to unified App Router structure",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_STORAGE_01",
@@ -465,7 +465,7 @@
       "feature": "R1: Storage Boundaries",
       "description": "Session storage handles empty messages array [] safely",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_STORAGE_02",
@@ -481,7 +481,7 @@
       "feature": "R1: Storage Boundaries",
       "description": "Corrupted/malformed JSON in localStorage recovers gracefully without throwing",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 6
     },
     {
       "id": "T2_STORAGE_04",
@@ -489,7 +489,7 @@
       "feature": "R1: Storage Boundaries",
       "description": "Special characters (unicode, emojis, HTML tags, null bytes) preserved with byte fidelity",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 2
     },
     {
       "id": "T2_STORAGE_05",
@@ -497,7 +497,7 @@
       "feature": "R1: Storage Boundaries",
       "description": "Rapid concurrent session updates preserve latest timestamp and data consistency",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T2_AUTH_01",
@@ -505,7 +505,7 @@
       "feature": "R1: Auth Boundaries",
       "description": "Whitespace-only Bearer token 'Bearer   ' degrades gracefully to guest",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T2_AUTH_02",
@@ -521,7 +521,7 @@
       "feature": "R1: Auth Boundaries",
       "description": "Expired JWT token rejected and flagged unauthenticated",
       "status": "PASSED",
-      "durationMs": 3
+      "durationMs": 1
     },
     {
       "id": "T2_AUTH_04",
@@ -529,7 +529,7 @@
       "feature": "R1: Auth Boundaries",
       "description": "Extremely long authorization header (>10KB) does not cause server crash",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_AUTH_05",
@@ -537,7 +537,7 @@
       "feature": "R1: Auth Boundaries",
       "description": "Empty Request object (null/undefined headers) returns guest session without crash",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_RATELIMIT_01",
@@ -545,7 +545,7 @@
       "feature": "R1: RateLimiter Boundaries",
       "description": "Burst of 50 rapid requests in <20ms accurately clamped at maximum limit",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_RATELIMIT_02",
@@ -561,7 +561,7 @@
       "feature": "R1: RateLimiter Boundaries",
       "description": "Boundary behavior at remaining === 0 vs limit + 1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_RATELIMIT_04",
@@ -569,7 +569,7 @@
       "feature": "R1: RateLimiter Boundaries",
       "description": "Reset window calculation returns positive integer reset duration",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_RATELIMIT_05",
@@ -593,7 +593,7 @@
       "feature": "R2: QueryRouter Boundaries",
       "description": "Extremely long query (>50,000 characters) classifies in <50ms without catastrophic backtracking",
       "status": "PASSED",
-      "durationMs": 4
+      "durationMs": 5
     },
     {
       "id": "T2_ROUTER_03",
@@ -617,7 +617,7 @@
       "feature": "R2: QueryRouter Boundaries",
       "description": "Explicit override parameter forces target intent regardless of text",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_WEBSEARCH_01",
@@ -625,7 +625,7 @@
       "feature": "R2: WebSearch Boundaries",
       "description": "Empty search query returns [] immediately without making network requests",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_WEBSEARCH_02",
@@ -633,7 +633,7 @@
       "feature": "R2: WebSearch Boundaries",
       "description": "Special character and punctuation-only queries handled safely",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_WEBSEARCH_03",
@@ -657,7 +657,7 @@
       "feature": "R2: WebSearch Boundaries",
       "description": "Malformed XML/RSS feed returned from news source handled without parser error",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_FAILOVER_01",
@@ -681,7 +681,7 @@
       "feature": "R2: ModelRotation Boundaries",
       "description": "Upstream 429 Too Many Requests rotates immediately without hammering rate-limited endpoint",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_FAILOVER_04",
@@ -697,7 +697,7 @@
       "feature": "R2: ModelRotation Boundaries",
       "description": "Extremely large prompt payload does not crash serialization",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_ENGINE_01",
@@ -721,7 +721,7 @@
       "feature": "R3: lotCodeEngine Boundaries",
       "description": "Malformed PCB JSON (syntax errors, missing brackets) returns null gracefully",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_ENGINE_04",
@@ -729,7 +729,7 @@
       "feature": "R3: lotCodeEngine Boundaries",
       "description": "Autonomous action with missing required fields returns null or invalid flag",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T2_ENGINE_05",
@@ -737,7 +737,7 @@
       "feature": "R3: lotCodeEngine Boundaries",
       "description": "Multiple code blocks in reply extracts the primary React app artifact",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T2_API_01",
@@ -745,7 +745,7 @@
       "feature": "R4: Chat API Boundaries",
       "description": "Empty JSON body {} returns 400 Bad Request",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_API_02",
@@ -753,7 +753,7 @@
       "feature": "R4: Chat API Boundaries",
       "description": "Empty messages array 'messages: []' returns 400 Bad Request",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_API_03",
@@ -769,7 +769,7 @@
       "feature": "R4: Chat API Boundaries",
       "description": "GET method on /api/chat returns 405 Method Not Allowed",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_API_05",
@@ -777,7 +777,7 @@
       "feature": "R4: Chat API Boundaries",
       "description": "Oversized request body handled safely without server out-of-memory",
       "status": "PASSED",
-      "durationMs": 5462
+      "durationMs": 1457
     },
     {
       "id": "T2_CANVAS_01",
@@ -785,7 +785,7 @@
       "feature": "R5: Canvases Boundaries",
       "description": "AppPreviewCanvas contains isolated iframe or runtime error boundary",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 3
     },
     {
       "id": "T2_CANVAS_02",
@@ -793,7 +793,7 @@
       "feature": "R5: Canvases Boundaries",
       "description": "PcbHardwareCanvas handles empty components and zero board dimensions safely",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_CANVAS_03",
@@ -801,7 +801,7 @@
       "feature": "R5: Canvases Boundaries",
       "description": "AutonomousActionCard handles empty/undefined parameters gracefully",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T2_CANVAS_04",
@@ -809,7 +809,7 @@
       "feature": "R5: Canvases Boundaries",
       "description": "MeetingAssistant HUD supports empty initial transcript state",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 2
     },
     {
       "id": "T2_CANVAS_05",
@@ -817,7 +817,7 @@
       "feature": "R5: Canvases Boundaries",
       "description": "AcademicCanvas handles malformed LaTeX expressions without throwing",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 2
     },
     {
       "id": "T2_SHELL_01",
@@ -825,7 +825,7 @@
       "feature": "R6: Shell Boundaries",
       "description": "Shell layout supports responsive resizing and drawer toggling",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2_SHELL_02",
@@ -833,7 +833,7 @@
       "feature": "R6: Shell Boundaries",
       "description": "Rapid canvas drawer switching preserves active tab without unmount crashes",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T2_SHELL_03",
@@ -849,7 +849,7 @@
       "feature": "R6: Shell Boundaries",
       "description": "Streaming hundreds of tokens rendered smoothly without DOM bloat",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2_SHELL_05",
@@ -857,7 +857,7 @@
       "feature": "R6: Shell Boundaries",
       "description": "Workspace recovery resets state safely when local storage is cleared",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T3_COMBO_01",
@@ -865,7 +865,7 @@
       "feature": "Cross-Feature: Web Grounding + React App",
       "description": "End-to-end pipeline: query routing -> live web search -> React code synthesis -> artifact sanitization",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 4
     },
     {
       "id": "T3_COMBO_02",
@@ -873,7 +873,7 @@
       "feature": "Cross-Feature: RateLimiter + Failover",
       "description": "Rate limiter precisely tracks attempts while model rotation seamlessly handles 503 outages",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 3
     },
     {
       "id": "T3_COMBO_03",
@@ -889,7 +889,7 @@
       "feature": "Cross-Feature: Action Extraction + Auth",
       "description": "User session context links to extracted autonomous action payload with pending status",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T3_COMBO_05",
@@ -897,7 +897,7 @@
       "feature": "Cross-Feature: PCB + Grounding + EDA",
       "description": "PCB circuit query grounded with sensor pinouts, generating structured 2-layer EDA schema",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T3_COMBO_06",
@@ -905,7 +905,7 @@
       "feature": "Cross-Feature: Academic Research + KaTeX",
       "description": "Academic paper query yields valid LaTeX equations and structured citations",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T4_SCENARIO_01",
@@ -929,7 +929,7 @@
       "feature": "Scenario: Autonomous Food Order",
       "description": "User Journey: Request food delivery -> AUTONOMOUS_ACTION -> Action payload extraction & confirmation lifecycle",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T4_SCENARIO_04",
@@ -937,7 +937,7 @@
       "feature": "Scenario: Academic KaTeX Review",
       "description": "User Journey: Literature query -> ACADEMIC_RESEARCH routing -> LaTeX equation & ArXiv citation extraction",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T4_SCENARIO_05",
@@ -945,7 +945,7 @@
       "feature": "Scenario: Meeting Agenda Builder",
       "description": "User Journey: Retrospective audio transcript -> MEETING_ASSISTANT routing -> Action items & agenda extraction",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 2
     }
   ]
 }

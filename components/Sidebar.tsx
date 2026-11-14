@@ -20,6 +20,12 @@ import {
   Bot,
   Headphones,
   GraduationCap,
+  PanelRight,
+  PanelRightClose,
+  Terminal,
+  ShieldCheck,
+  FileCode,
+  Network,
 } from "lucide-react";
 import { Conversation, UserProfile } from "@/lib/types";
 import { LotOsMode, LOT_OS_MODES } from "@/lib/lot-os/types";
@@ -39,9 +45,15 @@ interface SidebarProps {
   onOpenScheduleTasks: () => void;
   onOpenMeetingAssistant?: () => void;
   onOpenSkillsMarketplace?: () => void;
+  onOpenLotCode?: () => void;
   onOpenAuth: () => void;
   onOpenSettings: () => void;
   userProfile: UserProfile;
+  isCanvasVisible?: boolean;
+  onToggleCanvas?: () => void;
+  rightCanvasTab?: "workspace" | "diff" | "python";
+  onSelectRightCanvasTab?: (tab: "workspace" | "diff" | "python") => void;
+  selectedModel?: string;
 }
 
 const MODE_ICON_MAP: Record<LotOsMode, React.ComponentType<{ className?: string }>> = {
@@ -110,13 +122,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenScheduleTasks,
   onOpenMeetingAssistant,
   onOpenSkillsMarketplace,
+  onOpenLotCode,
   onOpenAuth,
   onOpenSettings,
   userProfile,
+  isCanvasVisible = true,
+  onToggleCanvas,
+  rightCanvasTab = "workspace",
+  onSelectRightCanvasTab,
+  selectedModel,
 }) => {
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [showAllHistory, setShowAllHistory] = useState(false);
+
+  const activeModeMeta = LOT_OS_MODES.find((m) => m.id === activeMode) || LOT_OS_MODES[0];
 
   const handleStartRename = (conv: Conversation, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -258,17 +278,107 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Tools & Management */}
-        <div className="px-3 py-2 border-b border-[#1a1a1d] space-y-1">
-          <div className="px-2 mb-1.5 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
-            Tools
+        {/* Workspace Canvas & Viewport Controls (Features Circled in Red) */}
+        <div className="px-3 py-2 border-b border-[#1a1a1d] bg-[#0c0c0f]/60 space-y-2">
+          <div className="px-2 flex items-center justify-between text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
+            <span className="truncate">{activeModeMeta.label} Canvas</span>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 shrink-0">
+              LOT RunTime
+            </span>
           </div>
+
+          {/* Toggle Canvas Button */}
+          {onToggleCanvas && (
+            <button
+              onClick={onToggleCanvas}
+              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-150 active:scale-[0.98] ${
+                isCanvasVisible
+                  ? "bg-blue-500/10 text-blue-300 border-blue-500/30 hover:bg-blue-500/20"
+                  : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2 min-w-0">
+                {isCanvasVisible ? (
+                  <PanelRightClose className="w-3.5 h-3.5 text-blue-400" />
+                ) : (
+                  <PanelRight className="w-3.5 h-3.5 text-zinc-400" />
+                )}
+                <span>{isCanvasVisible ? "Canvas: Active (Visible)" : "Canvas: Collapsed"}</span>
+              </div>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {isCanvasVisible ? "Hide" : "Show"}
+              </span>
+            </button>
+          )}
+
+          {/* Viewport Tabs Switcher */}
+          {onSelectRightCanvasTab && isCanvasVisible && (
+            <div className="grid grid-cols-3 gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-850">
+              <button
+                type="button"
+                onClick={() => onSelectRightCanvasTab("workspace")}
+                className={`py-1 text-[10px] font-medium rounded transition-colors text-center ${
+                  rightCanvasTab === "workspace"
+                    ? "bg-zinc-800 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                Workspace
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectRightCanvasTab("diff")}
+                className={`py-1 text-[10px] font-medium rounded transition-colors text-center ${
+                  rightCanvasTab === "diff"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                3-Way Diff
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectRightCanvasTab("python")}
+                className={`py-1 text-[10px] font-medium rounded transition-colors text-center ${
+                  rightCanvasTab === "python"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                Python WASM
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Tools & Codex Extensions (OpenAI Codex Architecture Blueprint) */}
+        <div className="px-3 py-2 border-b border-[#1a1a1d] space-y-1">
+          <div className="px-2 mb-1.5 flex items-center justify-between text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
+            <span>Codex Tools & Extensions</span>
+            <span className="text-[9px] font-mono text-zinc-600">MCP MESH</span>
+          </div>
+
+          {onOpenLotCode && (
+            <button
+              onClick={onOpenLotCode}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98] group"
+            >
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <FileCode className="w-4 h-4 text-cyan-400" />
+                <span>Coding Swarm Agent</span>
+              </div>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/40 text-cyan-400 border border-cyan-800/40">
+                Codex
+              </span>
+            </button>
+          )}
+
           <button
             onClick={onOpenProjects}
             className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
           >
             <Layers className="w-4 h-4 text-zinc-400" />
-            <span>Projects</span>
+            <span>Virtual Git Projects</span>
           </button>
 
           <button
@@ -276,7 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
           >
             <CalendarClock className="w-4 h-4 text-zinc-400" />
-            <span>Schedule tasks</span>
+            <span>Scheduled Tasks</span>
           </button>
 
           {onOpenSkillsMarketplace && (
@@ -285,9 +395,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
             >
               <Puzzle className="w-4 h-4 text-emerald-400" />
-              <span>Skills & Plugins</span>
+              <span>Skills & MCP Plugins</span>
             </button>
           )}
+        </div>
+
+        {/* Security Sandbox & Model Provider Status Banner */}
+        <div className="px-4 py-2 border-b border-[#1a1a1d] bg-black/40 space-y-1">
+          <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+            <span className="flex items-center gap-1 text-emerald-400">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              <span>Strix Sandbox</span>
+            </span>
+            <span className="text-zinc-650">3-Tier HITL Safe</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+            <span className="flex items-center gap-1 text-indigo-400">
+              <Network className="w-3 h-3 text-indigo-400" />
+              <span>Model Matrix</span>
+            </span>
+            <span className="text-zinc-400 truncate max-w-[120px]">
+              {selectedModel ? selectedModel.split("/").pop() : "NIM Multi-Key"}
+            </span>
+          </div>
         </div>
 
         {/* Chat History List */}

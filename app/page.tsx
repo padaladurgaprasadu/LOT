@@ -858,9 +858,15 @@ export default function Home() {
         onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
         onOpenMeetingAssistant={() => setMeetingAssistantOpen(true)}
         onOpenSkillsMarketplace={() => setSkillsMarketplaceOpen(true)}
+        onOpenLotCode={() => setLotCodeOpen(true)}
         onOpenAuth={() => setAuthOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         userProfile={userProfile}
+        isCanvasVisible={isCanvasVisible}
+        onToggleCanvas={() => setIsCanvasVisible(!isCanvasVisible)}
+        rightCanvasTab={rightCanvasTab}
+        onSelectRightCanvasTab={setRightCanvasTab}
+        selectedModel={selectedModel}
       />
 
       {/* Main Split-Screen Workspace Container */}
