@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
           <img
             src="/lot-logo.png"
             alt="LOT Logo"
-            className="w-11 h-11 sm:w-12 sm:h-12 object-contain drop-shadow-[0_0_12px_rgba(59,130,246,0.25)] contrast-125 brightness-110 transition-all duration-200"
+            className="w-10 h-10 sm:w-11 sm:h-11 object-contain contrast-125 brightness-110 transition-all duration-200"
             loading="eager"
           />
           <span className="font-bold text-xl tracking-tight text-white font-sans">

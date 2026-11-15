@@ -4,7 +4,7 @@
 
 :root {
   --background: #000000;
-  --foreground: #ededed;
+  --foreground: #ffffff;
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --sat: env(safe-area-inset-top, 0px);
@@ -35,35 +35,28 @@ html, body {
   touch-action: pan-y;
 }
 
-/* Butter-smooth GPU accelerated transitions */
-.gpu-layer {
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-}
-
-/* Minimalist responsive custom scrollbar */
+/* Custom Chalk Scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #27272a;
-  border-radius: 9999px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #52525b;
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #27272a transparent;
+  scrollbar-color: #27272a #000000;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -80,7 +73,7 @@ button, a, [role="button"] {
 }
 
 button:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 /* Prevent auto-zoom on iOS focus */
@@ -94,7 +87,7 @@ input, textarea, select {
   }
 }
 
-/* Fluid responsive typography */
+/* Blackboard Academic Typography */
 .prose-dark {
   color: #d4d4d8;
   font-size: 0.9375rem;
@@ -113,7 +106,7 @@ input, textarea, select {
 }
 
 .prose-dark h1, .prose-dark h2, .prose-dark h3, .prose-dark h4 {
-  color: #fafafa;
+  color: #ffffff;
   font-weight: 600;
   margin-top: 1.15rem;
   margin-bottom: 0.4rem;
@@ -137,35 +130,35 @@ input, textarea, select {
 }
 
 .prose-dark code:not(pre code) {
-  background-color: #18181b;
+  background-color: #09090b;
   border: 1px solid #27272a;
   padding: 0.15rem 0.35rem;
   border-radius: 0.375rem;
   font-size: 0.8125rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: #e4e4e7;
+  color: #ffffff;
 }
 
 .prose-dark a {
-  color: #60a5fa;
+  color: #ffffff;
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: #3b82f680;
+  text-decoration-color: #52525b;
   transition: text-decoration-color 0.15s ease;
 }
 
 .prose-dark a:hover {
-  text-decoration-color: #60a5fa;
+  text-decoration-color: #ffffff;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(3px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.18s var(--ease-spring) forwards;
+  animation: fadeIn 0.15s var(--ease-spring) forwards;
 }
 
 /* Mobile Safe Areas */

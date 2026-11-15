@@ -1,421 +1,443 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  MessageSquare,
-  Cpu,
-  Code2,
-  Bot,
-  Users,
-  GraduationCap,
-  Key,
-  ShieldCheck,
-  Network,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  ExternalLink,
-  Send,
-  Sparkles,
-  Paperclip,
-  PanelRightClose,
-  PanelRightOpen,
-  Terminal,
-  FileDiff,
-  Layers,
-} from "lucide-react";
-import { AIOSMode, ChatMessage, VerifiedCitation, ArtifactPayload } from "../types/aios";
-import BYOKVaultModal from "../components/modals/BYOKVaultModal";
-import ArtifactDock from "../components/dock/ArtifactDock";
+import React, { useState, useRef, useEffect } from "react";
 
-export default function ThreeZoneAdaptiveWorkspace() {
-  const [activeMode, setActiveMode] = useState<AIOSMode>("chat");
-  const [activeTab, setActiveTab] = useState<"workspace" | "diff" | "python">("workspace");
-  const [canvasActive, setCanvasActive] = useState(true);
-  const [isVaultOpen, setIsVaultOpen] = useState(false);
-  const [isDockOpen, setIsDockOpen] = useState(true);
-  const [inputPrompt, setInputPrompt] = useState("");
-  const [thinkingExpanded, setThinkingExpanded] = useState<Record<string, boolean>>({ "msg_1": false });
+interface VerifiedUrl {
+  title: string;
+  url: string;
+  snippet: string;
+  status: number;
+}
 
-  // Initial demonstration messages with genuine reasoning traces and verified citations
-  const [messages, setMessages] = useState<ChatMessage[]>([
+interface EntityCardData {
+  entity_title: string;
+  description: string;
+  extract: string;
+  hero_image: string;
+  official_url: string;
+  source: string;
+}
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  model?: string;
+  reasoning?: string;
+  verifiedUrls?: VerifiedUrl[];
+  entityCard?: EntityCardData;
+  webPreviewHtml?: string;
+}
+
+const QUICK_PROMPTS = [
+  "Give me an overview of Alan Turing with his official biographical sources",
+  "Build a responsive academic portfolio in clean HTML and CSS",
+  "Explain how Transformer self-attention works with mathematical notation",
+  "Find official documentation links for PyTorch and NVIDIA NIM",
+];
+
+export default function BlackboardLOTWorkspace() {
+  const [input, setInput] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [openReasoningId, setOpenReasoningId] = useState<string | null>(null);
+  const [activePreviewHtml, setActivePreviewHtml] = useState<string | null>(null);
+  const [previewTab, setPreviewTab] = useState<"rendered" | "source">("rendered");
+  const [nimKey, setNimKey] = useState("");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+
+  const [messages, setMessages] = useState<Message[]>([
     {
-      id: "msg_1",
+      id: "welcome",
       role: "assistant",
+      model: "moonshotai/kimi-k3.1-pro (2.8T)",
       content:
-        "Welcome to **LOT AIOS** — the autonomous Agentic AI Operating System powered by the 100% Heavyweight Model Matrix on NVIDIA NIM.\n\n" +
-        "You are connected to **DeepSeek-V4-Pro (1.6T)** for SWE & PCB synthesis, **Moonshot Kimi-K3.1-Pro (2.8T)** for Vision & Chat, and **Nemotron-3.5-Embed-8B** for 4096-dimensional dense vector memory.",
-      reasoning:
-        "Evaluated workspace initialization intent in 2.1ms.\n" +
-        "Connected to LiteLLM Gateway on port 4000 with 5-key NVIDIA NIM pool.\n" +
-        "Zero-404 citation probes verified active network connectivity.",
-      citations: [
-        {
-          url: "https://docs.tscircuit.com",
-          title: "tscircuit Documentation & Component Architecture",
-          snippet: "React component architecture for code-to-PCB hardware synthesis.",
-          verified: true,
-          statusCode: 200,
-        },
-        {
-          url: "https://react.dev",
-          title: "React Official Documentation",
-          snippet: "Frontier user interfaces and state management conventions.",
-          verified: true,
-          statusCode: 200,
-        },
-      ],
-      artifact: {
-        type: "pcb",
-        title: "BME280 Environmental Sensor Dual-Layer Breakout",
-        tsx: `import React from "react";
-
-export default function BME280Breakout() {
-  return (
-    <board width="25mm" height="18mm">
-      <chip name="U1" footprint="lga8" pcbX="0mm" pcbY="0mm" />
-      <resistor name="R1" resistance="4.7k" footprint="0603" pcbX="-6mm" pcbY="4mm" />
-      <capacitor name="C1" capacitance="100nF" footprint="0603" pcbX="5mm" pcbY="4mm" />
-    </board>
-  );
-}`,
-        dimensions: { width_mm: 25.0, height_mm: 18.0 },
-        layerCount: 2,
-        estimatedTotalUsd: 3.82,
-      },
-      timestamp: Date.now() - 60000,
+        "Welcome to **LOT AIOS** (Blackboard Edition). Running on direct NVIDIA NIM flagship models with zero neon styling, zero glow effects, and 100% HTTP-verified working URLs.",
     },
   ]);
 
-  const activeArtifact = messages[messages.length - 1]?.artifact || null;
+  const endRef = useRef<HTMLDivElement>(null);
 
-  const handleSendMessage = () => {
-    if (!inputPrompt.trim()) return;
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-    const userText = inputPrompt.trim();
-    setInputPrompt("");
+  function renderFormattedContent(text: string) {
+    const parts = text.split(/(```[\s\S]*?```)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith("```") && part.endsWith("```")) {
+        const lines = part.slice(3, -3).split("\n");
+        const lang = lines[0]?.trim() || "code";
+        const codeBody = lines.slice(1).join("\n");
+        return (
+          <div key={idx} className="my-3 rounded-lg overflow-hidden border border-zinc-800 bg-black">
+            <div className="px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+              <span>{lang}</span>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(codeBody)}
+                className="text-zinc-200 hover:text-white font-sans text-[11px]"
+              >
+                Copy
+              </button>
+            </div>
+            <pre className="p-4 text-xs font-mono text-zinc-100 overflow-x-auto leading-relaxed">
+              {codeBody}
+            </pre>
+          </div>
+        );
+      }
 
-    const userMsg: ChatMessage = {
-      id: `usr_${Date.now()}`,
-      role: "user",
-      content: userText,
-      timestamp: Date.now(),
-    };
+      const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+      const segments: React.ReactNode[] = [];
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
 
-    // Synthesize assistant response matching mode
-    let simulatedArtifact: ArtifactPayload | undefined = undefined;
-    let assistantReply = "";
-    const pLower = userText.toLowerCase();
+      while ((match = linkRegex.exec(part)) !== null) {
+        if (match.index > lastIndex) {
+          segments.push(part.slice(lastIndex, match.index));
+        }
+        segments.push(
+          <a
+            key={`${idx}-${match.index}`}
+            href={match[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white underline decoration-zinc-500 hover:text-zinc-300 font-medium"
+          >
+            {match[1]} ↗
+          </a>
+        );
+        lastIndex = linkRegex.lastIndex;
+      }
+      if (lastIndex < part.length) {
+        segments.push(part.slice(lastIndex));
+      }
 
-    if (pLower.includes("pcb") || pLower.includes("circuit") || activeMode === "pcb") {
-      assistantReply =
-        "Synthesized dual-layer PCB schematic and layout in **tscircuit React TSX**. Clearance rules and netlist connections have been verified.";
-      simulatedArtifact = {
-        type: "pcb",
-        title: "Hardware Circuit Synthesis",
-        tsx: `<board width="30mm" height="20mm">\n  <chip name="U1" footprint="soic8" />\n  <resistor name="R1" resistance="10k" />\n</board>`,
-        dimensions: { width_mm: 30, height_mm: 20 },
-        layerCount: 2,
-        estimatedTotalUsd: 2.95,
-      };
-    } else if (pLower.includes("code") || pLower.includes("react") || activeMode === "coding") {
-      assistantReply =
-        "Synthesized interactive React application. Sandpack WebContainers environment mounted in the **Artifact Dock**.";
-      simulatedArtifact = {
-        type: "code",
-        code: `import React from "react";\nexport default function App() {\n  return <div style={{ padding: 20, color: '#fff' }}>Interactive Sandpack Component</div>;\n}`,
-      };
-    } else if (pLower.includes("order") || pLower.includes("buy") || activeMode === "browser") {
-      assistantReply =
-        "CDP Agent navigated catalog and staged cart items. Paused at **Tier 3 Financial Security Gate** awaiting authorization.";
-      simulatedArtifact = {
-        type: "checkout",
-        checkoutCard: {
-          id: `card_${Date.now()}`,
-          service: "Swiggy",
-          title: "Artisan Woodfired Pizza Order",
-          items: [{ name: "Artisan Pizza", qty: 1, price: "$18.50" }],
-          total: "$21.20",
-          status: "pending_review",
-          hitlStep: 2,
-          affiliateUrl: "https://www.swiggy.com/?ref=LOT_AIOS_AFFILIATE",
-          address: "Delivery Address, Sector 4",
-        },
-      };
-    } else {
-      assistantReply =
-        "Processed via Moonshot Kimi-K3.1-Pro (2.8T) with verified status-200 live search grounding.";
-    }
+      return (
+        <span key={idx} className="whitespace-pre-wrap">
+          {segments}
+        </span>
+      );
+    });
+  }
 
-    const assistantMsg: ChatMessage = {
-      id: `ast_${Date.now()}`,
+  async function sendQuery(queryText: string) {
+    if (!queryText.trim() || isStreaming) return;
+
+    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: queryText };
+    const astId = `a-${Date.now() + 1}`;
+    const placeholder: Message = {
+      id: astId,
       role: "assistant",
-      content: assistantReply,
-      reasoning: `Deterministic sub-5ms router assigned query to frontier matrix role. Validated 4096d memory context.`,
-      citations: [
-        {
-          url: "https://github.com/padaladurgaprasadu/LOT",
-          title: "LOT AIOS Autonomous System Repository",
-          snippet: "Production-grade frontier AI operating system.",
-          verified: true,
-          statusCode: 200,
-        },
-      ],
-      artifact: simulatedArtifact,
-      timestamp: Date.now() + 100,
+      model: "Processing query...",
+      reasoning: "",
+      content: "",
+      verifiedUrls: [],
     };
 
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
-  };
+    setMessages((prev) => [...prev, userMsg, placeholder]);
+    setInput("");
+    setIsStreaming(true);
+
+    try {
+      const kernelUrl = process.env.NEXT_PUBLIC_LOT_KERNEL_URL || "http://localhost:8000";
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (nimKey.trim()) headers["x-custom-nim-key"] = nimKey.trim();
+
+      const resp = await fetch(`${kernelUrl}/api/v1/chat`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          session_id: "blackboard-session",
+          message: queryText,
+          agent_id: "general",
+          force_web_search: true,
+        }),
+      });
+
+      const reader = resp.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error("No stream reader");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const lines = decoder.decode(value, { stream: true }).split("\n");
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.replace("data: ", "").trim();
+          if (payload === "[DONE]") break;
+
+          try {
+            const evt = JSON.parse(payload);
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== astId) return m;
+                if (evt.type === "meta") return { ...m, model: evt.model };
+                if (evt.type === "verified_urls") return { ...m, verifiedUrls: evt.urls };
+                if (evt.type === "entity_card") return { ...m, entityCard: evt.card };
+                if (evt.type === "reasoning") return { ...m, reasoning: (m.reasoning || "") + evt.delta };
+                if (evt.type === "content") return { ...m, content: m.content + evt.delta };
+                if (evt.type === "web_preview") {
+                  setActivePreviewHtml(evt.html);
+                  return { ...m, webPreviewHtml: evt.html };
+                }
+                return m;
+              })
+            );
+          } catch {
+            // Ignore boundary chunk errors
+          }
+        }
+      }
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === astId
+            ? { ...m, content: "Kernel offline. Verify FastAPI backend is running at http://localhost:8000." }
+            : m
+        )
+      );
+    } finally {
+      setIsStreaming(false);
+    }
+  }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans antialiased">
-      {/* ========================================================================= */}
-      {/* ZONE 1: NAVIGATION TOGGLE SIDE PANEL (SIDEBAR)                            */}
-      {/* ========================================================================= */}
-      <aside className="w-64 h-full bg-zinc-950 border-r border-zinc-800 flex flex-col shrink-0 select-none">
-        {/* Brand Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-              L
+    <div className="flex h-screen w-screen bg-black text-white font-sans overflow-hidden">
+      {/* SIDEBAR: PURE BLACKBOARD STYLE */}
+      <aside className="w-64 border-r border-zinc-800 bg-black flex flex-col justify-between p-4 shrink-0">
+        <div>
+          <div className="flex items-center justify-between mb-6 px-1">
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 w-2.5 rounded-full bg-white" />
+              <span className="font-bold text-sm tracking-widest uppercase text-white">LOT AIOS</span>
             </div>
-            <div>
-              <span className="font-bold text-sm tracking-tight text-white block">LOT AIOS</span>
-              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">
-                Frontier OS v1.1
-              </span>
-            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-zinc-800 text-zinc-400">
+              v3.0 Mono
+            </span>
           </div>
+
           <button
-            onClick={() => setIsVaultOpen(true)}
-            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-            title="Open BYOK Vault"
+            onClick={() => {
+              setMessages((prev) => prev.slice(0, 1));
+              setActivePreviewHtml(null);
+            }}
+            className="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-white border border-zinc-800 transition mb-6 text-left"
           >
-            <Key className="w-4 h-4 text-indigo-400" />
+            + New Blackboard Session
           </button>
-        </div>
 
-        {/* Operating Modes Section */}
-        <div className="px-3 py-3 border-b border-zinc-800">
-          <span className="px-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold block mb-2">
-            Operating Modes
-          </span>
-          <div className="space-y-1">
-            {[
-              { id: "chat", label: "Cognitive Chat", icon: MessageSquare },
-              { id: "pcb", label: "Hardware / PCB", icon: Cpu },
-              { id: "coding", label: "Web / App Dev", icon: Code2 },
-              { id: "browser", label: "Autonomous Agent", icon: Bot },
-              { id: "meeting", label: "Meeting Assistant", icon: Users },
-              { id: "academic", label: "Academic Research", icon: GraduationCap },
-            ].map((m) => {
-              const Icon = m.icon;
-              const isActive = activeMode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => setActiveMode(m.id as AIOSMode)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-indigo-600/15 text-indigo-300 border border-indigo-500/30"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-indigo-400" : "text-zinc-500"}`} />
-                  <span>{m.label}</span>
-                </button>
-              );
-            })}
+          <div className="space-y-1.5 px-1">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-2">
+              Engine Status
+            </p>
+            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs space-y-1 font-mono">
+              <div className="flex justify-between text-zinc-400">
+                <span>Theme</span>
+                <span className="text-white">Blackboard</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Glow Effects</span>
+                <span className="text-white">Disabled</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Verification</span>
+                <span className="text-white">HTTP 200 OK</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Live Canvas & Workspace Controls */}
-        <div className="px-3 py-3 border-b border-zinc-800">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold">
-              Live Canvas
-            </span>
-            <button
-              onClick={() => setCanvasActive(!canvasActive)}
-              className={`text-[10px] font-mono px-2 py-0.5 rounded-full transition-colors ${
-                canvasActive
-                  ? "bg-emerald-500/20 text-emerald-300 font-semibold"
-                  : "bg-zinc-800 text-zinc-500"
-              }`}
-            >
-              {canvasActive ? "Active" : "Collapsed"}
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-1 bg-zinc-900 p-1 rounded-xl">
-            <button
-              onClick={() => setActiveTab("workspace")}
-              className={`py-1 text-[11px] font-medium rounded-lg transition-all flex items-center justify-center gap-1 ${
-                activeTab === "workspace" ? "bg-zinc-800 text-white shadow" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <Layers className="w-3 h-3" /> Space
-            </button>
-            <button
-              onClick={() => setActiveTab("diff")}
-              className={`py-1 text-[11px] font-medium rounded-lg transition-all flex items-center justify-center gap-1 ${
-                activeTab === "diff" ? "bg-zinc-800 text-white shadow" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <FileDiff className="w-3 h-3" /> Diff
-            </button>
-            <button
-              onClick={() => setActiveTab("python")}
-              className={`py-1 text-[11px] font-medium rounded-lg transition-all flex items-center justify-center gap-1 ${
-                activeTab === "python" ? "bg-zinc-800 text-white shadow" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <Terminal className="w-3 h-3" /> Py
-            </button>
-          </div>
-        </div>
-
-        {/* Status Indicators & Security Sandbox */}
-        <div className="mt-auto px-4 py-3 border-t border-zinc-800 bg-zinc-900/30 space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500">
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Strix Sandbox
-            </span>
-            <span className="text-zinc-400">3-Tier Safe</span>
-          </div>
-          <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500">
-            <span className="flex items-center gap-1.5 text-indigo-400">
-              <Network className="w-3.5 h-3.5 text-indigo-400" /> Model Matrix
-            </span>
-            <span className="text-zinc-400">NIM Multi-Key</span>
-          </div>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setShowKeyInput(!showKeyInput)}
+            className="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 transition text-left"
+          >
+            {showKeyInput ? "Hide NIM Key" : "Configure NIM API Key"}
+          </button>
+          {showKeyInput && (
+            <input
+              type="password"
+              value={nimKey}
+              onChange={(e) => setNimKey(e.target.value)}
+              placeholder="nvapi-..."
+              className="w-full rounded-lg bg-black border border-zinc-800 px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-500"
+            />
+          )}
         </div>
       </aside>
 
-      {/* ========================================================================= */}
-      {/* ZONE 2: CENTERED COGNITIVE STREAM                                         */}
-      {/* ========================================================================= */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-black relative">
-        {/* Top Navbar */}
-        <header className="h-14 px-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
-            <span className="font-medium text-white capitalize">{activeMode} Mode</span>
-            <span>•</span>
-            <span className="font-mono text-emerald-400">Zero-404 Grounding Verified</span>
-          </div>
-          <button
-            onClick={() => setIsDockOpen(!isDockOpen)}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
-          >
-            {isDockOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-            <span>Artifact Dock</span>
-          </button>
+      {/* CENTER READING STREAM */}
+      <main className="flex-1 flex flex-col h-full min-w-0 bg-black">
+        <header className="h-14 border-b border-zinc-800 px-6 flex items-center justify-between bg-black">
+          <span className="text-xs font-mono text-zinc-400">
+            Blackboard Mode // Pure Monochrome Typography
+          </span>
+          {activePreviewHtml && (
+            <button
+              onClick={() => setActivePreviewHtml(null)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-900 font-mono"
+            >
+              Close Canvas
+            </button>
+          )}
         </header>
 
-        {/* Message Stream */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map((msg) => {
-              const isAssistant = msg.role === "assistant";
-              const isThinkOpen = thinkingExpanded[msg.id] ?? false;
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-4xl mx-auto w-full">
+          {messages.length === 1 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2">
+              {QUICK_PROMPTS.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendQuery(q)}
+                  className="p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-left text-xs text-zinc-300 transition"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
 
-              return (
-                <div key={msg.id} className="space-y-3">
-                  {/* Assistant Header & Thinking Pill */}
-                  {isAssistant && msg.reasoning && (
-                    <div className="space-y-2">
-                      <button
-                        onClick={() =>
-                          setThinkingExpanded((prev) => ({ ...prev, [msg.id]: !isThinkOpen }))
-                        }
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-mono transition-colors"
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+            >
+              {msg.role === "assistant" && (
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="text-xs font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded">
+                    {msg.model}
+                  </span>
+                  {msg.reasoning && (
+                    <button
+                      onClick={() => setOpenReasoningId(openReasoningId === msg.id ? null : msg.id)}
+                      className="text-xs font-mono text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded"
+                    >
+                      {openReasoningId === msg.id ? "Hide Trace" : "Thinking Trace"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Entity Enrichment Card (Hero Image + Verified URLs) */}
+              {msg.entityCard && (
+                <div className="my-3 w-full max-w-xl rounded-xl border border-zinc-800 bg-black overflow-hidden">
+                  {msg.entityCard.hero_image && (
+                    <div className="h-48 w-full overflow-hidden bg-zinc-950">
+                      <img
+                        src={msg.entityCard.hero_image}
+                        alt={msg.entityCard.entity_title}
+                        className="h-full w-full object-cover grayscale contrast-125"
+                      />
+                    </div>
+                  )}
+                  <div className="p-4 space-y-2">
+                    <h4 className="text-sm font-bold text-white">{msg.entityCard.entity_title}</h4>
+                    <p className="text-xs text-zinc-400 line-clamp-3">{msg.entityCard.extract}</p>
+                    {msg.entityCard.official_url && (
+                      <a
+                        href={msg.entityCard.official_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-xs text-white underline font-mono pt-1"
                       >
-                        <Sparkles className="w-3 h-3 text-indigo-400" />
-                        <span>Thinking Trace</span>
-                        {isThinkOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </button>
-
-                      {isThinkOpen && (
-                        <div className="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800 text-xs font-mono text-zinc-400 whitespace-pre-line leading-relaxed">
-                          {msg.reasoning}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Verified Citations Pills */}
-                  {isAssistant && msg.citations && msg.citations.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {msg.citations.map((c, idx) => (
-                        <a
-                          key={idx}
-                          href={c.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 hover:text-emerald-200 text-[11px] transition-colors"
-                        >
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                          <span className="font-medium truncate max-w-[160px]">{c.title}</span>
-                          <span className="font-mono text-[9px] bg-emerald-500/20 px-1 py-0.2 rounded text-emerald-300">
-                            200
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Content Bubble */}
-                  <div
-                    className={`p-4 rounded-2xl text-sm leading-relaxed ${
-                      isAssistant
-                        ? "bg-zinc-900/40 border border-zinc-800 text-zinc-200"
-                        : "bg-indigo-600/10 border border-indigo-500/30 text-white ml-auto max-w-[85%]"
-                    }`}
-                  >
-                    <div className="whitespace-pre-line">{msg.content}</div>
+                        Official Reference ↗
+                      </a>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              )}
+
+              {/* Verified Working URLs */}
+              {msg.verifiedUrls && msg.verifiedUrls.length > 0 && (
+                <div className="w-full mb-3 p-3 rounded-lg bg-zinc-950 border border-zinc-800">
+                  <p className="text-[11px] font-mono text-zinc-400 mb-2">
+                    Verified Working URLs (HTTP 200 OK):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {msg.verifiedUrls.map((u, idx) => (
+                      <a
+                        key={idx}
+                        href={u.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-2.5 py-1 rounded bg-black hover:bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono flex items-center gap-1.5"
+                      >
+                        <span>[{idx + 1}]</span>
+                        <span className="truncate max-w-[200px]">{u.title}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Message Bubble */}
+              <div
+                className={`rounded-xl px-5 py-3.5 text-sm leading-relaxed max-w-3xl ${
+                  msg.role === "user"
+                    ? "bg-zinc-800 text-white font-medium border border-zinc-700"
+                    : "bg-black border border-zinc-800 text-zinc-100"
+                }`}
+              >
+                {renderFormattedContent(msg.content)}
+              </div>
+            </div>
+          ))}
+          <div ref={endRef} />
         </div>
 
-        {/* Chat Input Bar */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-950/80 backdrop-blur-md">
-          <div className="max-w-3xl mx-auto flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-2.5 shadow-2xl focus-within:border-indigo-500 transition-colors">
-            <button className="text-zinc-500 hover:text-zinc-300 transition-colors">
-              <Paperclip className="w-4 h-4" />
-            </button>
+        {/* BOTTOM INPUT BAR */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendQuery(input);
+          }}
+          className="p-4 border-t border-zinc-800 bg-black"
+        >
+          <div className="max-w-4xl mx-auto flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5">
             <input
               type="text"
-              value={inputPrompt}
-              onChange={(e) => setInputPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              placeholder="Ask anything, design hardware circuits, or dispatch autonomous coding tasks..."
-              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask anything on the Blackboard..."
+              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none font-mono"
             />
             <button
-              onClick={handleSendMessage}
-              disabled={!inputPrompt.trim()}
-              className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-all shadow-md shadow-indigo-600/30"
+              type="submit"
+              disabled={isStreaming}
+              className="px-4 py-2 rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-50 text-black font-semibold text-xs font-mono transition"
             >
-              <Send className="w-3.5 h-3.5" />
+              {isStreaming ? "Writing..." : "Submit"}
             </button>
           </div>
-        </div>
+        </form>
       </main>
 
-      {/* ========================================================================= */}
-      {/* ZONE 3: CONTEXT-AWARE MORPHING ARTIFACT DOCK                              */}
-      {/* ========================================================================= */}
-      <ArtifactDock
-        artifact={activeArtifact}
-        isOpen={isDockOpen}
-        onClose={() => setIsDockOpen(false)}
-      />
-
-      {/* BYOK Key Vault Modal */}
-      <BYOKVaultModal isOpen={isVaultOpen} onClose={() => setIsVaultOpen(false)} />
+      {/* RIGHT PREVIEW CANVAS */}
+      {activePreviewHtml && (
+        <section className="w-[42%] border-l border-zinc-800 bg-black flex flex-col h-full shrink-0">
+          <div className="h-14 border-b border-zinc-800 px-4 flex items-center justify-between bg-black">
+            <span className="text-xs font-mono text-zinc-400">Live Canvas Preview</span>
+            <button
+              onClick={() => setActivePreviewHtml(null)}
+              className="text-xs font-mono text-zinc-400 hover:text-white"
+            >
+              [X]
+            </button>
+          </div>
+          <div className="flex-1 p-4 overflow-auto">
+            <iframe
+              title="Blackboard Canvas"
+              srcDoc={activePreviewHtml}
+              sandbox="allow-scripts"
+              className="w-full h-full rounded-lg border border-zinc-800 bg-white"
+            />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

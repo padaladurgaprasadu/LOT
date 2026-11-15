@@ -184,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <img
               src="/lot-logo.png"
               alt="LOT Logo"
-              className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.25)] contrast-125 brightness-110"
+              className="w-8 h-8 sm:w-9 sm:h-9 object-contain contrast-125 brightness-110"
               loading="eager"
             />
             <span className="text-base font-bold tracking-tight text-white font-sans">
@@ -236,7 +236,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98] group ${
                     isActive
-                      ? `${color.bg} ${color.text} border ${color.border} shadow-[0_0_12px_rgba(0,0,0,0.5)] font-semibold`
+                      ? "bg-zinc-800 text-white border border-zinc-700 font-semibold"
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-[#141417] border border-transparent"
                   }`}
                   title={modeMeta.description}
@@ -245,7 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <Icon
                       className={`w-4 h-4 shrink-0 transition-colors ${
                         isActive
-                          ? color.text
+                          ? "text-white"
                           : "text-zinc-500 group-hover:text-zinc-300"
                       }`}
                     />
@@ -253,10 +253,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   {isActive ? (
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${color.dot} shadow-[0_0_8px_currentColor]`}
+                      className="w-1.5 h-1.5 rounded-full bg-white"
                     />
                   ) : (
-                    <span className="text-[10px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity font-mono">
                       Open
                     </span>
                   )}

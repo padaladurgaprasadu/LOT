@@ -160,8 +160,8 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
       {/* Top OS Workspace Bar & Canvas Toggle */}
       <div className="shrink-0 border-b border-zinc-900/90 bg-[#08080a]/95 backdrop-blur-md px-3 sm:px-4 py-2.5 z-10 flex items-center justify-between gap-2">
         <div className="flex items-center space-x-2.5 min-w-0">
-          <div className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+          <div className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-medium text-white font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-white" />
             <span>{MODE_LABEL_MAP[mode] || "Cognitive Chat"}</span>
           </div>
           <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline">
@@ -180,7 +180,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
               {isCanvasVisible ? "Hide Canvas" : "Show Canvas"}
             </span>
             {isCanvasVisible ? (
-              <PanelRightClose className="w-4 h-4 text-blue-400" />
+              <PanelRightClose className="w-4 h-4 text-white" />
             ) : (
               <PanelRight className="w-4 h-4 text-zinc-400" />
             )}
