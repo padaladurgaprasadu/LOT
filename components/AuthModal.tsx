@@ -33,6 +33,38 @@ export function AuthModal({
 
   if (!isOpen) return null;
 
+  const isNetworkFailure = (err: any) => {
+    const msg = (err?.message || "").toLowerCase();
+    return (
+      err?.name === "TypeError" ||
+      msg.includes("failed to fetch") ||
+      msg.includes("networkerror") ||
+      msg.includes("fetch failed") ||
+      msg.includes("load failed") ||
+      msg.includes("abort") ||
+      msg.includes("connection refused")
+    );
+  };
+
+  const loginLocally = () => {
+    const fallbackUser: LotUser = {
+      id: crypto.randomUUID(),
+      email: email || "user@lot.local",
+      name: name || (email ? email.split("@")[0] : "LOT Sovereign User"),
+      plan: "free",
+    };
+    setLocalUser(fallbackUser);
+    onSuccess?.(fallbackUser);
+    onAuthSuccess?.({
+      id: fallbackUser.id,
+      name: fallbackUser.name,
+      email: fallbackUser.email,
+      isLoggedIn: true,
+      mode: "local",
+    });
+    onClose();
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -94,23 +126,14 @@ export function AuthModal({
         }
       } else {
         // Instant local auth fallback before Supabase keys are added
-        const fallbackUser: LotUser = {
-          id: crypto.randomUUID(),
-          email,
-          name: name || email.split("@")[0],
-          plan: "free",
-        };
-        setLocalUser(fallbackUser);
-        onSuccess?.(fallbackUser);
-        onAuthSuccess?.({
-          id: fallbackUser.id,
-          name: fallbackUser.name,
-          email: fallbackUser.email,
-          isLoggedIn: true,
-        });
-        onClose();
+        loginLocally();
       }
     } catch (err: any) {
+      if (isNetworkFailure(err)) {
+        console.warn("[LOT Auth] Supabase cloud unreachable. Falling back to sovereign local login:", err);
+        loginLocally();
+        return;
+      }
       setError(err?.message || "Authentication failed. Please try again.");
     } finally {
       setLoading(false);
@@ -120,15 +143,50 @@ export function AuthModal({
   const handleOAuth = async (provider: "google" | "github") => {
     setError(null);
     if (isSupabaseConfigured && supabase) {
-      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: typeof window !== "undefined" ? window.location.origin : "" },
-      });
-      if (oauthErr) setError(oauthErr.message);
+      try {
+        const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: typeof window !== "undefined" ? window.location.origin : "" },
+        });
+        if (oauthErr) throw oauthErr;
+      } catch (err: any) {
+        if (isNetworkFailure(err)) {
+          const providerUser: LotUser = {
+            id: crypto.randomUUID(),
+            email: `user_${provider}@lot.ai`,
+            name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+            plan: "free",
+          };
+          setLocalUser(providerUser);
+          onSuccess?.(providerUser);
+          onAuthSuccess?.({
+            id: providerUser.id,
+            name: providerUser.name,
+            email: providerUser.email,
+            isLoggedIn: true,
+          });
+          onClose();
+          return;
+        }
+        setError(err?.message || `OAuth authentication with ${provider} failed.`);
+      }
     } else {
-      setError(
-        `Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local to enable ${provider} OAuth.`
-      );
+      // Instant local login with that provider
+      const providerUser: LotUser = {
+        id: crypto.randomUUID(),
+        email: `guest_${provider}@lot.local`,
+        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Explorer`,
+        plan: "free",
+      };
+      setLocalUser(providerUser);
+      onSuccess?.(providerUser);
+      onAuthSuccess?.({
+        id: providerUser.id,
+        name: providerUser.name,
+        email: providerUser.email,
+        isLoggedIn: true,
+      });
+      onClose();
     }
   };
 
@@ -263,9 +321,18 @@ export function AuthModal({
           </div>
 
           {error && (
-            <p className="rounded-lg bg-red-950/60 border border-red-800/70 px-3 py-2 text-xs text-red-300">
-              {error}
-            </p>
+            <div className="space-y-2">
+              <p className="rounded-lg bg-red-950/60 border border-red-800/70 px-3 py-2 text-xs text-red-300">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={loginLocally}
+                className="w-full text-center text-xs text-neutral-400 hover:text-white underline py-1"
+              >
+                Or continue instantly in Local Sovereign Mode →
+              </button>
+            </div>
           )}
 
           <button

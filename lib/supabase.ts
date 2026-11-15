@@ -6,7 +6,13 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Conversation, Message, Project, ScheduledTask, UserProfile } from "./types";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hvthwecmcifvjewwlpqk.supabase.co";
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const isPlaceholder =
+  !rawUrl ||
+  rawUrl.includes("hvthwecmcifvjewwlpqk") ||
+  rawUrl.includes("example.supabase.co");
+
+const SUPABASE_URL = isPlaceholder ? "" : rawUrl;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
@@ -14,7 +20,9 @@ let supabaseInstance: SupabaseClient | null = null;
 let supabaseAdminInstance: SupabaseClient | null = null;
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.length > 20);
+  return Boolean(
+    !isPlaceholder && SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.length > 20
+  );
 }
 
 export function getSupabaseClient(): SupabaseClient | null {

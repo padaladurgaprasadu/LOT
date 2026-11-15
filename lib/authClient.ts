@@ -4,8 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
+// Detect whether a real custom Supabase project URL is provided (not dead tutorial placeholder)
+const isPlaceholderUrl =
+  !supabaseUrl ||
+  supabaseUrl.includes("hvthwecmcifvjewwlpqk") ||
+  supabaseUrl.includes("example.supabase.co");
+
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseAnonKey && supabaseAnonKey.length > 20
+  !isPlaceholderUrl && supabaseUrl && supabaseAnonKey && supabaseAnonKey.length > 20
 );
 
 export const supabase = isSupabaseConfigured
