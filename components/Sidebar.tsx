@@ -1,34 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   SquarePen,
-  Layers,
   CalendarClock,
+  Search,
+  X,
   Settings,
   Trash2,
   Edit2,
+  PanelLeftClose,
   PanelLeft,
   MessageSquare,
   Sparkles,
-  FileText,
-  Puzzle,
-  ChevronDown,
-  ChevronUp,
-  Cpu,
-  Code2,
-  Bot,
-  Headphones,
-  GraduationCap,
-  PanelRight,
-  PanelRightClose,
-  Terminal,
-  ShieldCheck,
-  FileCode,
-  Network,
 } from "lucide-react";
 import { Conversation, UserProfile } from "@/lib/types";
-import { LotOsMode, LOT_OS_MODES } from "@/lib/lot-os/types";
+import { LotOsMode } from "@/lib/lot-os/types";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -41,7 +28,7 @@ interface SidebarProps {
   onNewChat: () => void;
   onDeleteConversation: (id: string) => void;
   onRenameConversation: (id: string, newTitle: string) => void;
-  onOpenProjects: () => void;
+  onOpenProjects?: () => void;
   onOpenScheduleTasks: () => void;
   onOpenMeetingAssistant?: () => void;
   onOpenSkillsMarketplace?: () => void;
@@ -56,87 +43,91 @@ interface SidebarProps {
   selectedModel?: string;
 }
 
-const MODE_ICON_MAP: Record<LotOsMode, React.ComponentType<{ className?: string }>> = {
-  chat: MessageSquare,
-  pcb: Cpu,
-  app: Code2,
-  agent: Bot,
-  meeting: Headphones,
-  academic: GraduationCap,
-};
+interface GroupedConversations {
+  today: Conversation[];
+  yesterday: Conversation[];
+  lastWeek: Conversation[];
+  older: Conversation[];
+}
 
-const MODE_COLOR_MAP: Record<
-  LotOsMode,
-  { text: string; bg: string; border: string; dot: string }
-> = {
-  chat: {
-    text: "text-blue-400",
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/40",
-    dot: "bg-blue-400",
-  },
-  pcb: {
-    text: "text-amber-400",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/40",
-    dot: "bg-amber-400",
-  },
-  app: {
-    text: "text-emerald-400",
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/40",
-    dot: "bg-emerald-400",
-  },
-  agent: {
-    text: "text-purple-400",
-    bg: "bg-purple-500/10",
-    border: "border-purple-500/40",
-    dot: "bg-purple-400",
-  },
-  meeting: {
-    text: "text-rose-400",
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/40",
-    dot: "bg-rose-400",
-  },
-  academic: {
-    text: "text-cyan-400",
-    bg: "bg-cyan-500/10",
-    border: "border-cyan-500/40",
-    dot: "bg-cyan-400",
-  },
-};
+function formatChatTime(timestamp?: number): string {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) {
+    return "Yesterday";
+  }
+
+  const isCurrentYear = date.getFullYear() === now.getFullYear();
+  if (isCurrentYear) {
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  return date.toLocaleDateString([], { month: "short", day: "numeric", year: "2-digit" });
+}
+
+function groupConversations(convs: Conversation[]): GroupedConversations {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+  const startOfLastWeek = startOfToday - 7 * 24 * 60 * 60 * 1000;
+
+  const groups: GroupedConversations = {
+    today: [],
+    yesterday: [],
+    lastWeek: [],
+    older: [],
+  };
+
+  for (const conv of convs) {
+    const time = conv.updatedAt || conv.createdAt || 0;
+    if (time >= startOfToday) {
+      groups.today.push(conv);
+    } else if (time >= startOfYesterday) {
+      groups.yesterday.push(conv);
+    } else if (time >= startOfLastWeek) {
+      groups.lastWeek.push(conv);
+    } else {
+      groups.older.push(conv);
+    }
+  }
+
+  return groups;
+}
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
-  activeMode = "chat",
-  onSelectMode,
   conversations,
   activeConvId,
   onSelectConversation,
   onNewChat,
   onDeleteConversation,
   onRenameConversation,
-  onOpenProjects,
   onOpenScheduleTasks,
-  onOpenMeetingAssistant,
-  onOpenSkillsMarketplace,
-  onOpenLotCode,
   onOpenAuth,
   onOpenSettings,
   userProfile,
-  isCanvasVisible = true,
-  onToggleCanvas,
-  rightCanvasTab = "workspace",
-  onSelectRightCanvasTab,
-  selectedModel,
 }) => {
+  const [searchQuery, setSearchQuery] = useState("");
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [showAllHistory, setShowAllHistory] = useState(false);
-
-  const activeModeMeta = LOT_OS_MODES.find((m) => m.id === activeMode) || LOT_OS_MODES[0];
 
   const handleStartRename = (conv: Conversation, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -152,35 +143,136 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setEditingConvId(null);
   };
 
-  // Sort conversations chronologically (present / current chats first)
-  const sortedConversations = [...conversations].sort(
-    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)
-  );
-  const INITIAL_LIMIT = 5;
-  const visibleConversations = showAllHistory
-    ? sortedConversations
-    : sortedConversations.slice(0, INITIAL_LIMIT);
-  const remainingCount = sortedConversations.length - INITIAL_LIMIT;
+  // Sort conversations chronologically (most recently updated first)
+  const sortedConversations = useMemo(() => {
+    return [...conversations].sort((a, b) => {
+      const timeA = a.updatedAt || a.createdAt || 0;
+      const timeB = b.updatedAt || b.createdAt || 0;
+      return timeB - timeA;
+    });
+  }, [conversations]);
+
+  // Filter conversations based on search input
+  const filteredConversations = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedConversations;
+    return sortedConversations.filter((c) => (c.title || "").toLowerCase().includes(q));
+  }, [sortedConversations, searchQuery]);
+
+  const grouped = useMemo(() => {
+    return groupConversations(filteredConversations);
+  }, [filteredConversations]);
+
+  const renderConversationItem = (conv: Conversation) => {
+    const isActive = conv.id === activeConvId;
+    const isEditing = conv.id === editingConvId;
+    const timeFormatted = formatChatTime(conv.updatedAt || conv.createdAt);
+
+    return (
+      <div
+        key={conv.id}
+        onClick={() => {
+          onSelectConversation(conv.id);
+          onClose();
+        }}
+        className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 ${
+          isActive
+            ? "bg-[#18181b] text-white font-medium border border-zinc-700/80 shadow-sm"
+            : "text-zinc-400 hover:text-zinc-200 hover:bg-[#121215] border border-transparent"
+        }`}
+      >
+        <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+          <MessageSquare
+            className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+              isActive ? "text-white" : "text-zinc-500 group-hover:text-zinc-400"
+            }`}
+          />
+          {isEditing ? (
+            <form
+              onSubmit={(e) => handleSaveRename(conv.id, e)}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1"
+            >
+              <input
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={() => setEditingConvId(null)}
+                autoFocus
+                className="w-full bg-[#0a0a0c] text-white text-xs px-2 py-1 rounded-lg border border-zinc-700 focus:outline-none"
+              />
+            </form>
+          ) : (
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="truncate leading-snug">{conv.title || "New Chat"}</span>
+              {timeFormatted && (
+                <span className="text-[10px] text-zinc-500 font-mono leading-none mt-0.5">
+                  {timeFormatted}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Hover Action Buttons: Rename & Delete */}
+        {!isEditing && (
+          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity shrink-0 ml-1.5">
+            <button
+              type="button"
+              onClick={(e) => handleStartRename(conv, e)}
+              className="p-1 text-zinc-400 hover:text-white rounded hover:bg-zinc-800 transition-colors"
+              title="Rename chat"
+            >
+              <Edit2 className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteConversation(conv.id);
+              }}
+              className="p-1 text-zinc-400 hover:text-red-400 rounded hover:bg-zinc-800 transition-colors"
+              title="Delete chat"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSection = (title: string, items: Conversation[]) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-1 mb-3">
+        <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase font-mono">
+          {title}
+        </div>
+        <div className="space-y-0.5">{items.map(renderConversationItem)}</div>
+      </div>
+    );
+  };
 
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity"
           onClick={onClose}
         />
       )}
 
-      {/* Main Sidebar Shell */}
+      {/* Main Professional Sidebar Shell */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#09090b] border-r border-[#1a1a1d] flex flex-col transition-transform duration-200 ease-in-out shadow-2xl ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#09090b] border-r border-[#1f1f23] flex flex-col transition-transform duration-200 ease-in-out shadow-2xl select-none ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Top Header with Real Logo & PanelLeft Toggle Icon */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#1a1a1d]">
-          <div className="flex items-center space-x-3">
+        {/* Top Header with Undisturbed Logo & Toggle Switch */}
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#1f1f23]">
+          <div className="flex items-center space-x-3 select-none">
             <img
               src="/lot-logo.png"
               alt="LOT Logo"
@@ -192,334 +284,111 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
-            title="Close Sidebar"
+            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/80 transition-colors"
+            title="Toggle Sidebar"
           >
-            <PanelLeft className="w-4 h-4 text-zinc-300" />
+            <PanelLeftClose className="w-4 h-4 text-zinc-300" />
           </button>
         </div>
 
-        {/* Top Action: New Chat */}
-        <div className="px-3 pt-3 pb-1">
+        {/* Action Controls: New Chat, Scheduled & Search Symbol */}
+        <div className="px-3 pt-3 pb-2 space-y-2 border-b border-[#1f1f23]/60">
+          {/* New Chat Button */}
           <button
-            onClick={onNewChat}
-            className="w-full flex items-center space-x-3 px-3.5 py-2.5 text-zinc-200 hover:text-white bg-[#141417]/80 hover:bg-[#1a1a1f] border border-zinc-800/80 hover:border-zinc-700 rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
+            type="button"
+            onClick={() => {
+              onNewChat();
+              onClose();
+            }}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 bg-white hover:bg-zinc-200 text-black rounded-xl text-xs font-semibold transition-all duration-150 active:scale-[0.98] shadow-sm"
           >
-            <SquarePen className="w-4 h-4 text-white" />
-            <span>New chat</span>
-          </button>
-        </div>
-
-        {/* LOT-OS Multi-Agent Workspaces (Features requested in Side Panel) */}
-        <div className="px-3 py-2 border-b border-[#1a1a1d]">
-          <div className="px-2 mb-2 flex items-center justify-between text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-            <span>OS Workspaces</span>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              LOT-OS
-            </span>
-          </div>
-          <div className="space-y-1">
-            {LOT_OS_MODES.map((modeMeta) => {
-              const Icon = MODE_ICON_MAP[modeMeta.id] || Sparkles;
-              const isActive = activeMode === modeMeta.id;
-              const color = MODE_COLOR_MAP[modeMeta.id];
-
-              return (
-                <button
-                  key={modeMeta.id}
-                  onClick={() => {
-                    if (onSelectMode) {
-                      onSelectMode(modeMeta.id);
-                    }
-                    onClose();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98] group ${
-                    isActive
-                      ? "bg-zinc-800 text-white border border-zinc-700 font-semibold"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#141417] border border-transparent"
-                  }`}
-                  title={modeMeta.description}
-                >
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <Icon
-                      className={`w-4 h-4 shrink-0 transition-colors ${
-                        isActive
-                          ? "text-white"
-                          : "text-zinc-500 group-hover:text-zinc-300"
-                      }`}
-                    />
-                    <span className="truncate">{modeMeta.label}</span>
-                  </div>
-                  {isActive ? (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full bg-white"
-                    />
-                  ) : (
-                    <span className="text-[10px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity font-mono">
-                      Open
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* Direct Access to Standalone Swarm Studio */}
-            <a
-              href="/agent-swarm"
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-indigo-300 hover:text-white bg-indigo-950/20 hover:bg-indigo-950/50 border border-indigo-900/50 transition-all duration-150 active:scale-[0.98] group mt-1.5"
-            >
-              <div className="flex items-center space-x-2.5 min-w-0">
-                <Layers className="w-4 h-4 text-indigo-400 shrink-0" />
-                <span className="truncate font-semibold">Coding Swarm Studio</span>
-              </div>
-              <span className="text-[10px] text-indigo-400 font-mono">Launch &rarr;</span>
-            </a>
-          </div>
-        </div>
-
-        {/* Workspace Canvas & Viewport Controls (Features Circled in Red) */}
-        <div className="px-3 py-2 border-b border-[#1a1a1d] bg-[#0c0c0f]/60 space-y-2">
-          <div className="px-2 flex items-center justify-between text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-            <span className="truncate">{activeModeMeta.label} Canvas</span>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 shrink-0">
-              LOT RunTime
-            </span>
-          </div>
-
-          {/* Toggle Canvas Button */}
-          {onToggleCanvas && (
-            <button
-              onClick={onToggleCanvas}
-              className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-150 active:scale-[0.98] ${
-                isCanvasVisible
-                  ? "bg-blue-500/10 text-blue-300 border-blue-500/30 hover:bg-blue-500/20"
-                  : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200"
-              }`}
-            >
-              <div className="flex items-center space-x-2 min-w-0">
-                {isCanvasVisible ? (
-                  <PanelRightClose className="w-3.5 h-3.5 text-blue-400" />
-                ) : (
-                  <PanelRight className="w-3.5 h-3.5 text-zinc-400" />
-                )}
-                <span>{isCanvasVisible ? "Canvas: Active (Visible)" : "Canvas: Collapsed"}</span>
-              </div>
-              <span className="text-[10px] font-mono text-zinc-500">
-                {isCanvasVisible ? "Hide" : "Show"}
-              </span>
-            </button>
-          )}
-
-          {/* Viewport Tabs Switcher */}
-          {onSelectRightCanvasTab && isCanvasVisible && (
-            <div className="grid grid-cols-3 gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-850">
-              <button
-                type="button"
-                onClick={() => onSelectRightCanvasTab("workspace")}
-                className={`py-1 text-[10px] font-medium rounded transition-colors text-center ${
-                  rightCanvasTab === "workspace"
-                    ? "bg-zinc-800 text-white shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                Workspace
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectRightCanvasTab("diff")}
-                className={`py-1 text-[10px] font-medium rounded transition-colors text-center ${
-                  rightCanvasTab === "diff"
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                3-Way Diff
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectRightCanvasTab("python")}
-                className={`py-1 text-[10px] font-medium rounded transition-colors text-center ${
-                  rightCanvasTab === "python"
-                    ? "bg-amber-600 text-white shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                Python WASM
-              </button>
+            <div className="flex items-center space-x-2.5">
+              <SquarePen className="w-4 h-4 text-black" />
+              <span>New chat</span>
             </div>
-          )}
-        </div>
-
-        {/* Tools & Codex Extensions (OpenAI Codex Architecture Blueprint) */}
-        <div className="px-3 py-2 border-b border-[#1a1a1d] space-y-1">
-          <div className="px-2 mb-1.5 flex items-center justify-between text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
-            <span>Codex Tools & Extensions</span>
-            <span className="text-[9px] font-mono text-zinc-600">MCP MESH</span>
-          </div>
-
-          {onOpenLotCode && (
-            <button
-              onClick={onOpenLotCode}
-              className="w-full flex items-center justify-between px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98] group"
-            >
-              <div className="flex items-center space-x-2.5 min-w-0">
-                <FileCode className="w-4 h-4 text-cyan-400" />
-                <span>Coding Swarm Agent</span>
-              </div>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/40 text-cyan-400 border border-cyan-800/40">
-                Codex
-              </span>
-            </button>
-          )}
-
-          <button
-            onClick={onOpenProjects}
-            className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
-          >
-            <Layers className="w-4 h-4 text-zinc-400" />
-            <span>Virtual Git Projects</span>
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-300">
+              Ctrl+N
+            </kbd>
           </button>
 
+          {/* Scheduled Tasks Button */}
           <button
-            onClick={onOpenScheduleTasks}
-            className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
+            type="button"
+            onClick={() => {
+              onOpenScheduleTasks();
+              onClose();
+            }}
+            className="w-full flex items-center justify-between px-3.5 py-2 text-zinc-300 hover:text-white bg-[#121215] hover:bg-[#18181c] border border-zinc-800/80 hover:border-zinc-700 rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
           >
-            <CalendarClock className="w-4 h-4 text-zinc-400" />
-            <span>Scheduled Tasks</span>
-          </button>
-
-          {onOpenSkillsMarketplace && (
-            <button
-              onClick={onOpenSkillsMarketplace}
-              className="w-full flex items-center space-x-3 px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-[#141417] rounded-xl text-xs font-medium transition-all duration-150 active:scale-[0.98]"
-            >
-              <Puzzle className="w-4 h-4 text-emerald-400" />
-              <span>Skills & MCP Plugins</span>
-            </button>
-          )}
-        </div>
-
-        {/* Security Sandbox & Model Provider Status Banner */}
-        <div className="px-4 py-2 border-b border-[#1a1a1d] bg-black/40 space-y-1">
-          <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
-            <span className="flex items-center gap-1 text-emerald-400">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              <span>Strix Sandbox</span>
-            </span>
-            <span className="text-zinc-650">3-Tier HITL Safe</span>
-          </div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
-            <span className="flex items-center gap-1 text-indigo-400">
-              <Network className="w-3 h-3 text-indigo-400" />
-              <span>Model Matrix</span>
-            </span>
-            <span className="text-zinc-400 truncate max-w-[120px]">
-              {selectedModel ? selectedModel.split("/").pop() : "NIM Multi-Key"}
-            </span>
-          </div>
-        </div>
-
-        {/* Chat History List */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
-          {sortedConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-              <p className="text-xs text-zinc-600 font-medium">No conversations yet</p>
+            <div className="flex items-center space-x-2.5">
+              <CalendarClock className="w-4 h-4 text-zinc-400" />
+              <span>Scheduled</span>
             </div>
-          ) : (
-            <div>
-              <div className="px-3 mb-2 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
-                Recent Chats
-              </div>
-              <div className="space-y-1">
-                {visibleConversations.map((conv) => {
-                  const isActive = conv.id === activeConvId;
-                  const isEditing = conv.id === editingConvId;
+            <span className="text-[10px] text-zinc-500 font-mono">Tasks</span>
+          </button>
 
-                  return (
-                    <div
-                      key={conv.id}
-                      onClick={() => onSelectConversation(conv.id)}
-                      className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 ease-out ${
-                        isActive
-                          ? "bg-[#18181b] text-white font-medium shadow-sm"
-                          : "text-zinc-400 hover:text-zinc-200 hover:bg-[#121214]"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2.5 min-w-0 flex-1">
-                        <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                        {isEditing ? (
-                          <form
-                            onSubmit={(e) => handleSaveRename(conv.id, e)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex-1"
-                          >
-                            <input
-                              type="text"
-                              value={editingTitle}
-                              onChange={(e) => setEditingTitle(e.target.value)}
-                              onBlur={() => setEditingConvId(null)}
-                              autoFocus
-                              className="w-full bg-[#0a0a0c] text-white text-xs px-2 py-1 rounded-lg border border-zinc-700 focus:outline-none"
-                            />
-                          </form>
-                        ) : (
-                          <span className="truncate">{conv.title || "New Chat"}</span>
-                        )}
-                      </div>
+          {/* Search Symbol & Input Bar */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search chats..."
+              className="w-full bg-[#121215] text-zinc-200 text-xs pl-8 pr-7 py-2 rounded-xl border border-zinc-800/80 focus:border-zinc-600 focus:outline-none placeholder-zinc-500 font-sans transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-0.5"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
 
-                      {/* Hover Actions: Rename & Delete */}
-                      {!isEditing && (
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity">
-                          <button
-                            onClick={(e) => handleStartRename(conv, e)}
-                            className="p-1 hover:text-white rounded hover:bg-zinc-800"
-                            title="Rename"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteConversation(conv.id);
-                            }}
-                            className="p-1 hover:text-red-400 rounded hover:bg-zinc-800"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* View More / Show Less Button */}
-              {sortedConversations.length > INITIAL_LIMIT && (
+        {/* Chat History List with Timestamps */}
+        <div className="flex-1 overflow-y-auto px-2 py-2.5 custom-scrollbar">
+          {filteredConversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-center px-4">
+              <MessageSquare className="w-6 h-6 text-zinc-700 mb-2" />
+              <p className="text-xs text-zinc-500 font-medium">
+                {searchQuery ? "No matching chats found" : "No conversations yet"}
+              </p>
+              {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setShowAllHistory(!showAllHistory)}
-                  className="w-full mt-2.5 flex items-center justify-center space-x-1.5 px-3 py-2 text-xs text-zinc-400 hover:text-white bg-[#121215] hover:bg-[#18181c] border border-zinc-800/80 rounded-xl transition-all duration-150 active:scale-[0.98]"
+                  onClick={() => setSearchQuery("")}
+                  className="mt-2 text-[11px] text-zinc-400 hover:text-white underline font-mono"
                 >
-                  <span className="font-medium">
-                    {showAllHistory
-                      ? "Show Less"
-                      : `View More (${remainingCount} older)`}
-                  </span>
-                  {showAllHistory ? (
-                    <ChevronUp className="w-3.5 h-3.5 text-zinc-400" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-                  )}
+                  Clear search
                 </button>
               )}
             </div>
+          ) : searchQuery.trim() ? (
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase font-mono">
+                Search Results ({filteredConversations.length})
+              </div>
+              <div className="space-y-0.5">{filteredConversations.map(renderConversationItem)}</div>
+            </div>
+          ) : (
+            <>
+              {renderSection("Today", grouped.today)}
+              {renderSection("Yesterday", grouped.yesterday)}
+              {renderSection("Previous 7 Days", grouped.lastWeek)}
+              {renderSection("Older", grouped.older)}
+            </>
           )}
         </div>
 
-        {/* Bottom Section: User Profile Details */}
-        <div className="p-3 border-t border-[#1a1a1d] bg-black">
+        {/* Bottom Section: User Profile & Settings */}
+        <div className="p-3 border-t border-[#1f1f23] bg-black">
           <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#121215] transition-all duration-150">
             <div
               onClick={onOpenAuth}
@@ -534,16 +403,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     ? userProfile.name || "User"
                     : userProfile.name || "Guest User"}
                 </span>
-                <span className="text-[10px] text-blue-400 font-medium truncate">
-                  {userProfile.isLoggedIn
-                    ? userProfile.email
-                    : "24h Free Preview • Sign In"}
+                <span className="text-[10px] text-zinc-500 font-medium truncate">
+                  {userProfile.isLoggedIn ? userProfile.email : "Signed Out"}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center space-x-1 pl-1">
               <button
+                type="button"
                 onClick={onOpenSettings}
                 className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/80 transition-colors"
                 title="Settings"
@@ -557,3 +425,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
+
+export default Sidebar;
