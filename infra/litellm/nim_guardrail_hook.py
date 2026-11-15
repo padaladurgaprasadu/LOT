@@ -31,6 +31,12 @@ PROHIBITED_MODELS = {
 
 # Flagship models requiring maximum reasoning effort
 REASONING_FLAGSHIP_MODELS = {
+    "kimi-k3.1-pro",
+    "moonshotai/kimi-k3.1-pro",
+    "nemotron-3.5-super-vl-120b-a12b",
+    "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3-ultra-550b-a55b",
     "deepseek-v4-pro",
     "deepseek-ai/deepseek-v4-pro",
     "deepseek-r1",

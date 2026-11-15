@@ -462,9 +462,14 @@ async function callNvidiaNim(
 
   const candidateModels = [
     options?.preferredModel,
+    "moonshotai/kimi-k3.1-pro",
+    "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "minimaxai/minimax-m3.1-flash",
+    "poolside/laguna-xs-2.1",
+    "google/gemma-4-31b-it",
     "deepseek-ai/deepseek-r1",
     "meta/llama-3.3-70b-instruct",
-    "nvidia/llama-3.1-nemotron-70b-instruct",
   ].filter(Boolean) as string[];
 
   for (const model of candidateModels) {

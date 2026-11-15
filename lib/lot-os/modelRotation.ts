@@ -118,7 +118,7 @@ export const PROVIDER_CONFIGS: Record<ProviderName, ProviderConfig> = {
   nvidia: {
     name: "nvidia",
     envKey: "NVIDIA_API_KEY",
-    defaultModel: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    defaultModel: "moonshotai/kimi-k3.1-pro",
     hostname: "integrate.api.nvidia.com",
     path: "/v1/chat/completions",
     port: 443,
@@ -128,7 +128,7 @@ export const PROVIDER_CONFIGS: Record<ProviderName, ProviderConfig> = {
       Connection: "keep-alive",
     }),
     buildBody: (model, messages, stream) => ({
-      model: model || "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      model: model || "moonshotai/kimi-k3.1-pro",
       messages,
       temperature: 0.3,
       max_tokens: 4096,

@@ -106,18 +106,28 @@ function postCompletion(provider: ProviderConfig, messages: ChatMessage[], opts:
 }
 
 /**
- * The coding model. Nemotron reasons well and is on the free tier; the agent keeps the
- * temperature low because code wants determinism, not creativity.
+ * NVIDIA NIM Coding Models matrix.
+ * Frontier agentic coding models on NVIDIA NIM with 0-downtime failover rotation.
  */
-export const LOT_CODE_MODEL = process.env.LOT_CODE_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+export const LOT_CODING_MODELS = [
+  "moonshotai/kimi-k3.1-pro",
+  "minimaxai/minimax-m3.1-flash",
+  "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "poolside/laguna-xs-2.1",
+  "nvidia/nemotron-3-ultra-550b-a55b",
+  "google/gemma-4-31b-it",
+] as const;
+
+export const LOT_CODE_MODEL = process.env.LOT_CODE_MODEL || "moonshotai/kimi-k3.1-pro";
 
 export function isModelConfigured(): boolean {
   return Boolean(process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY || process.env.GROQ_API_KEY);
 }
 
 /**
- * Runs one completion, trying NVIDIA first and falling back to Groq. Throws only when
- * every configured provider fails, so the caller can surface a real error to the user.
+ * Runs one completion, trying primary NVIDIA coding model and rotating across the
+ * full NVIDIA NIM coding matrix (Kimi 3T, MiniMax M3.1, Nemotron 3.5 Super VL,
+ * Laguna-XS, Nemotron-3 Ultra 550B, Gemma-4 31B), then falling back to Groq.
  */
 export async function completeWithModel(messages: ChatMessage[], options: CompletionOptions = {}): Promise<string> {
   const opts: Required<CompletionOptions> = {
@@ -131,13 +141,26 @@ export async function completeWithModel(messages: ChatMessage[], options: Comple
 
   const providers: ProviderConfig[] = [];
   if (nvidiaKey) {
-    providers.push({
-      hostname: "integrate.api.nvidia.com",
-      path: "/v1/chat/completions",
-      apiKey: nvidiaKey,
-      model: LOT_CODE_MODEL,
-      label: "NVIDIA",
-    });
+    const candidateModels = [
+      LOT_CODE_MODEL,
+      "minimaxai/minimax-m3.1-flash",
+      "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "poolside/laguna-xs-2.1",
+      "nvidia/nemotron-3-ultra-550b-a55b",
+      "google/gemma-4-31b-it",
+    ];
+
+    for (const model of candidateModels) {
+      if (!providers.some((p) => p.model === model)) {
+        providers.push({
+          hostname: "integrate.api.nvidia.com",
+          path: "/v1/chat/completions",
+          apiKey: nvidiaKey,
+          model,
+          label: `NVIDIA (${model})`,
+        });
+      }
+    }
   }
   if (groqKey) {
     providers.push({

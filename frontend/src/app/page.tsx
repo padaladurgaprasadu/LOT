@@ -49,7 +49,7 @@ export default function BlackboardLOTWorkspace() {
     {
       id: "welcome",
       role: "assistant",
-      model: "moonshotai/kimi-k3.1-pro (2.8T)",
+      model: "moonshotai/kimi-k3.1-pro (3T)",
       content:
         "Welcome to **LOT AIOS** (Blackboard Edition). Running on direct NVIDIA NIM flagship models with zero neon styling, zero glow effects, and 100% HTTP-verified working URLs.",
     },

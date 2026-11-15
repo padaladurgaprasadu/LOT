@@ -58,7 +58,15 @@ def build_litellm_flagship_router(keys: List[str]) -> Router:
     model_list = []
 
     for idx, api_key in enumerate(active_keys):
-        # 1. Daily Chat & General Knowledge: Moonshot Kimi-K3.1-Pro (2.8T)
+        # 1. Primary Agentic Coding & Daily Omni: Moonshot Kimi-K3.1-Pro (3T, 1M context)
+        model_list.append({
+            "model_name": "lot-coding-swe",
+            "litellm_params": {
+                "model": "nvidia_nim/moonshotai/kimi-k3.1-pro",
+                "api_key": api_key,
+                "api_base": "https://integrate.api.nvidia.com/v1",
+            },
+        })
         model_list.append({
             "model_name": "lot-daily-omni",
             "litellm_params": {
@@ -67,16 +75,15 @@ def build_litellm_flagship_router(keys: List[str]) -> Router:
                 "api_base": "https://integrate.api.nvidia.com/v1",
             },
         })
-        # 2. Coding, Web Dev & Software Engineering: DeepSeek-V4-Pro (1.6T)
+        # 2. Hybrid Mamba-Transformer MoE Coding & Planning: Nemotron-3-Ultra (550B, 1M context)
         model_list.append({
-            "model_name": "lot-coding-swe",
+            "model_name": "lot-coding-nemotron-ultra",
             "litellm_params": {
-                "model": "nvidia_nim/deepseek-ai/deepseek-v4-pro",
+                "model": "nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b",
                 "api_key": api_key,
                 "api_base": "https://integrate.api.nvidia.com/v1",
             },
         })
-        # 3. Deep Technical, Science & Live Research: Nemotron-3-Ultra (550B)
         model_list.append({
             "model_name": "lot-deep-research",
             "litellm_params": {
@@ -85,11 +92,38 @@ def build_litellm_flagship_router(keys: List[str]) -> Router:
                 "api_base": "https://integrate.api.nvidia.com/v1",
             },
         })
-        # 4. High-Speed Agentic Backup: GLM-5.3 (753B)
+        # 3. Nemotron 3.5 Super VL (120B reasoning, tool-calling & multimodal)
         model_list.append({
-            "model_name": "lot-agent-backup",
+            "model_name": "lot-coding-nemotron-vl",
             "litellm_params": {
-                "model": "nvidia_nim/z-ai/glm-5.3",
+                "model": "nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b",
+                "api_key": api_key,
+                "api_base": "https://integrate.api.nvidia.com/v1",
+            },
+        })
+        # 4. MiniMax-M3.1-Flash (multimodal MoE coding & computer use)
+        model_list.append({
+            "model_name": "lot-coding-minimax",
+            "litellm_params": {
+                "model": "nvidia_nim/minimaxai/minimax-m3.1-flash",
+                "api_key": api_key,
+                "api_base": "https://integrate.api.nvidia.com/v1",
+            },
+        })
+        # 5. Poolside Laguna-XS-2.1 (33B MoE for long-horizon agentic coding & terminal tasks)
+        model_list.append({
+            "model_name": "lot-coding-poolside",
+            "litellm_params": {
+                "model": "nvidia_nim/poolside/laguna-xs-2.1",
+                "api_key": api_key,
+                "api_base": "https://integrate.api.nvidia.com/v1",
+            },
+        })
+        # 6. Google Gemma-4-31B-IT (dense 31B frontier reasoning for coding)
+        model_list.append({
+            "model_name": "lot-coding-gemma",
+            "litellm_params": {
+                "model": "nvidia_nim/google/gemma-4-31b-it",
                 "api_key": api_key,
                 "api_base": "https://integrate.api.nvidia.com/v1",
             },
