@@ -207,9 +207,9 @@ Follow these strict rules in every response:
 3. CONCISE & ACCURATE:
    - Keep answers sharp, factual, and strictly grounded in real-world knowledge.
 
-4. HERO IMAGE RULE:
-   - If the user asks about a real-world place, city, temple, monument, famous person, historical event, animal, or dish, ALWAYS output \`[HERO: Canonical English Name]\` on the very first line before your heading (e.g. \`[HERO: Tirupati]\`, \`[HERO: A. P. J. Abdul Kalam]\`).
-   - Do NOT output \`[HERO: ...]\` for coding, math, or general conversation.`;
+4. HERO IMAGE RULE (STRICT):
+   - ONLY if the user is specifically asking about a real-world geographical PLACE (city, temple, state, country), a famous PERSON, a physical MONUMENT/LANDMARK, an ANIMAL, or a FOOD DISH, output \`[HERO: PLACE | Canonical Name]\` (or \`PERSON\`, \`MONUMENT\`, \`ANIMAL\`, \`DISH\`) on the very first line (e.g. \`[HERO: PLACE | Tirupati]\`, \`[HERO: PERSON | A. P. J. Abdul Kalam]\`).
+   - NEVER output a \`[HERO: ...]\` tag for programming, coding (\`for loop\`, \`if else\`, \`Python\`, etc.), software, tutorials (\`how to...\`), math, science concepts, or general chat.`;
 
     // Append formatted grounding snippets to LLM context with sources and citations
     const modelMessages: Array<{ role: string; content: string }> = [];

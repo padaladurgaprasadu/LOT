@@ -27,6 +27,7 @@ import { cleanModelOutput } from "./cleanModelOutput";
 
 interface MessageItemProps {
   message: Message;
+  userPrompt?: string;
   isStreaming?: boolean;
   onEditMessage?: (messageId: string, content: string) => void;
   onShareMessage?: (message: Message) => void;
@@ -110,6 +111,7 @@ export function cleanAndNormalizeMarkdown(content: string): string {
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
+  userPrompt = "",
   isStreaming = false,
   onEditMessage,
   onShareMessage,
@@ -246,7 +248,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   const { heroEntity, cleanMarkdown } = isUser
     ? { heroEntity: null, cleanMarkdown: message.content }
-    : cleanModelOutput(message.content);
+    : cleanModelOutput(message.content, userPrompt);
   const normalizedContent = cleanAndNormalizeMarkdown(cleanMarkdown);
 
   // Strict rule: Hero images ONLY show when the model explicitly tagged [HERO: Entity Name]
@@ -257,7 +259,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const effectiveHeroEntity =
     !isUser &&
     heroEntity &&
-    !isExcludedConcept.test(heroEntity)
+    !isExcludedConcept.test(heroEntity) &&
+    !isExcludedConcept.test(userPrompt)
       ? heroEntity
       : null;
 
@@ -269,7 +272,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       )}
 
       {/* Fallback to single hero banner only if verified real place/entity and NOT technical */}
-      {!isUser && !effectiveHeroEntity && message.heroImage && message.heroImage.imageUrl && !isExcludedConcept.test(message.heroImage.title) && (
+      {!isUser && !effectiveHeroEntity && message.heroImage && message.heroImage.imageUrl && !isExcludedConcept.test(message.heroImage.title) && !isExcludedConcept.test(userPrompt) && (
         <div className="mb-4 w-full max-w-sm sm:max-w-md rounded-2xl overflow-hidden border border-zinc-800 bg-[#0e0e11] shadow-xl">
           <div className="relative w-full aspect-[16/10] max-h-56 bg-zinc-900 overflow-hidden">
             <img

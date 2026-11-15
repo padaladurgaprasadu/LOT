@@ -160,6 +160,10 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
               isLoading && idx === messages.length - 1 && message.role === "assistant";
             const actionPreview =
               message.role === "assistant" ? extractActionPreview(message.content) : null;
+            const userPrompt =
+              idx > 0 && messages[idx - 1].role === "user"
+                ? messages[idx - 1].content
+                : "";
 
             return (
               <div key={message.id} className="w-full space-y-2">
@@ -167,6 +171,8 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                 <div className="w-full max-w-4xl mx-auto">
                   <MessageItem
                     message={message}
+                    userPrompt={userPrompt}
+                    isStreaming={isLastAssistant}
                     onShareMessage={onShareMessage}
                     onEditMessage={onEditMessage}
                   />

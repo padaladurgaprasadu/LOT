@@ -7,68 +7,115 @@ interface HeroImage {
   title: string;
 }
 
-const EXCLUDED_TECHNICAL_PATTERNS =
-  /\b(code|coding|program|programming|python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|react|vue|angular|nextjs|node|django|flask|loop|for\s+loop|while|if|else|if\s+else|switch|case|function|def|class|variable|array|object|json|api|sdk|algorithm|data\s+structure|git|github|debug|bug|error|exception|syntax|install|import|export|npm|pip|tutorial|how\s+to|what\s+is|explain|write|create|build|make|run|compile|test|math|equation|calculate|formula)\b/i;
+// Reject Wikipedia pages whose description matches software, coding, or abstract concepts
+const BLOCKED_WIKI_DESCRIPTIONS =
+  /\b(programming|software|language|computer|algorithm|statement|data structure|library|framework|operating system|protocol|mathematics|concept|disambiguation|wikimedia|syntax|theorem|function)\b/i;
+
+// Allow Wikipedia pages that have coordinates (places/landmarks) OR match visual entity descriptions
+const ALLOWED_WIKI_DESCRIPTIONS =
+  /\b(city|town|village|state|country|district|island|mountain|hill|river|lake|beach|temple|church|mosque|monument|palace|fort|building|park|politician|actor|actress|singer|musician|player|cricketer|footballer|scientist|author|entrepreneur|businessperson|billionaire|leader|emperor|king|queen|animal|bird|mammal|reptile|species|breed|dish|food|cuisine|dessert|beverage|planet|galaxy)\b/i;
+
+function isValidRealPhotoUrl(url: string): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  // Block SVGs, SVG thumbnails (.svg.png), GIFs, icons, logos, flags, and maps
+  if (/\.svg(\.png|\.jpg)?$/i.test(lower)) return false;
+  if (lower.endsWith(".gif") || lower.endsWith(".tif") || lower.endsWith(".webm")) return false;
+  if (
+    /\b(logo|icon|symbol|flag_of|coat_of_arms|map_of|locator_map|diagram|flowchart|screenshot|signature|stub)\b/i.test(
+      lower
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
 
 export function HeroImageGallery({ entity }: { entity: string | null }) {
   const [images, setImages] = useState<HeroImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!entity || !entity.trim() || EXCLUDED_TECHNICAL_PATTERNS.test(entity.trim())) {
+    if (!entity || !entity.trim()) {
       setImages([]);
       return;
     }
 
     let isMounted = true;
 
-    async function fetchHeroImages(query: string) {
+    async function fetchVerifiedHeroImages(query: string) {
       try {
-        const cleanQuery = query.trim();
-        // 1. Get top Wikipedia articles + lead high-res images for the entity
-        const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-          cleanQuery
-        )}&gsrlimit=4&prop=pageimages&piprop=original|thumbnail&pithumbsize=800&format=json&origin=*`;
-
-        // 2. Also fetch high-res photography from Wikimedia Commons
-        const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-          cleanQuery
-        )}%20filetype:bitmap&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
-
-        const [wikiRes, commonsRes] = await Promise.all([
-          fetch(wikiSearchUrl, {
+        // STEP 1: Resolve exact Wikipedia page and verify it is a real-world visual entity
+        const searchRes = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+            query
+          )}&srlimit=1&format=json&origin=*`,
+          {
             headers: { "Api-User-Agent": "LOT-AIOS/1.0 (contact: github.com/padaladurgaprasadu/LOT)" },
-          })
-            .then((r) => r.json())
-            .catch(() => null),
-          fetch(commonsUrl, {
+          }
+        ).then((r) => r.json());
+
+        const bestTitle = searchRes?.query?.search?.[0]?.title;
+        if (!bestTitle) {
+          if (isMounted) setImages([]);
+          return;
+        }
+
+        const summaryRes = await fetch(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+            bestTitle
+          )}`,
+          {
             headers: { "Api-User-Agent": "LOT-AIOS/1.0 (contact: github.com/padaladurgaprasadu/LOT)" },
-          })
-            .then((r) => r.json())
-            .catch(() => null),
-        ]);
+          }
+        ).then((r) => r.json());
+
+        const description = `${summaryRes?.description || ""} ${
+          summaryRes?.extract || ""
+        }`;
+        const hasCoordinates = Boolean(summaryRes?.coordinates);
+
+        // Reject immediately if it's a coding/software/abstract topic
+        if (BLOCKED_WIKI_DESCRIPTIONS.test(description)) {
+          if (isMounted) setImages([]);
+          return;
+        }
+
+        // Only allow if it has geographic coordinates (Place/Temple/Monument) OR matches Person/Place/Animal/Dish
+        if (!hasCoordinates && !ALLOWED_WIKI_DESCRIPTIONS.test(description)) {
+          if (isMounted) setImages([]);
+          return;
+        }
 
         const collected: HeroImage[] = [];
         const seenUrls = new Set<string>();
 
-        // Extract Wikipedia lead images first (most accurate for people & places)
-        const wikiPages = wikiRes?.query?.pages ? Object.values(wikiRes.query.pages) : [];
-        for (const page of wikiPages as any[]) {
-          const imgUrl = page?.thumbnail?.source || page?.original?.source;
-          if (imgUrl && !imgUrl.endsWith(".svg") && !seenUrls.has(imgUrl)) {
-            seenUrls.add(imgUrl);
-            collected.push({ url: imgUrl, title: page.title });
-          }
+        // Add primary Wikipedia image if it's a real photo
+        const leadImg =
+          summaryRes?.originalimage?.source || summaryRes?.thumbnail?.source;
+        if (leadImg && isValidRealPhotoUrl(leadImg)) {
+          seenUrls.add(leadImg);
+          collected.push({ url: leadImg, title: bestTitle });
         }
 
-        // Fill remaining slots up to 4 images from Wikimedia Commons
-        const commonsPages = commonsRes?.query?.pages ? Object.values(commonsRes.query.pages) : [];
+        // STEP 2: Fetch additional real photos strictly for this verified entity from Commons
+        const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+          `"${bestTitle}"`
+        )}%20filetype:bitmap%20-logo%20-map%20-icon&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+
+        const commonsRes = await fetch(commonsUrl, {
+          headers: { "Api-User-Agent": "LOT-AIOS/1.0 (contact: github.com/padaladurgaprasadu/LOT)" },
+        }).then((r) => r.json());
+        const commonsPages = commonsRes?.query?.pages
+          ? Object.values(commonsRes.query.pages)
+          : [];
+
         for (const page of commonsPages as any[]) {
-          const imgUrl = page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url;
+          const imgUrl =
+            page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url;
           if (
             imgUrl &&
-            !imgUrl.endsWith(".svg") &&
-            !imgUrl.endsWith(".gif") &&
+            isValidRealPhotoUrl(imgUrl) &&
             !seenUrls.has(imgUrl)
           ) {
             seenUrls.add(imgUrl);
@@ -80,27 +127,26 @@ export function HeroImageGallery({ entity }: { entity: string | null }) {
           if (collected.length >= 4) break;
         }
 
-        if (isMounted && collected.length > 0) {
-          setImages(collected.slice(0, 4));
+        // Only show the gallery if we found at least 2 real photos
+        if (isMounted) {
+          setImages(collected.length >= 2 ? collected.slice(0, 4) : []);
         }
-      } catch (err) {
-        console.error("Failed to load hero images:", err);
+      } catch {
+        if (isMounted) setImages([]);
       }
     }
 
-    fetchHeroImages(entity);
+    fetchVerifiedHeroImages(entity);
     return () => {
       isMounted = false;
     };
   }, [entity]);
 
-  if (!entity || !images.length || EXCLUDED_TECHNICAL_PATTERNS.test(entity)) return null;
+  if (!images.length) return null;
 
   return (
     <>
-      {/* ChatGPT-Style 4-Photo Bento Hero Grid */}
       <div className="mb-5 grid grid-cols-1 md:grid-cols-3 gap-2 rounded-2xl overflow-hidden w-full max-w-3xl border border-neutral-800 bg-neutral-900/40 shadow-xl">
-        {/* Main Large Left Hero Image */}
         <div
           onClick={() => setSelectedImage(images[0].url)}
           className="md:col-span-2 h-56 md:h-64 relative cursor-pointer overflow-hidden group bg-neutral-950"
@@ -116,7 +162,6 @@ export function HeroImageGallery({ entity }: { entity: string | null }) {
           </div>
         </div>
 
-        {/* Right Stacked Images */}
         <div className="grid grid-cols-3 md:grid-cols-1 gap-2 h-24 md:h-64">
           {images.slice(1, 4).map((img, idx) => (
             <div
@@ -138,7 +183,6 @@ export function HeroImageGallery({ entity }: { entity: string | null }) {
         </div>
       </div>
 
-      {/* Click-to-Expand Fullscreen Lightbox */}
       {selectedImage && (
         <div
           onClick={() => setSelectedImage(null)}
