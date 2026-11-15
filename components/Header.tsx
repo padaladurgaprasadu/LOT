@@ -2,18 +2,26 @@
 
 import React from "react";
 import { PanelLeft } from "lucide-react";
+import { LotUser } from "@/lib/authClient";
+import { TopAuthBar } from "./TopAuthBar";
 
 interface HeaderProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  user?: LotUser | null;
+  onOpenAuth?: () => void;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   isSidebarOpen,
   onToggleSidebar,
+  user = null,
+  onOpenAuth = () => {},
+  onLogout = () => {},
 }) => {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between w-full px-4 sm:px-6 py-3.5 bg-black min-h-[60px]">
+    <header className="sticky top-0 z-30 flex items-center justify-between w-full px-4 sm:px-6 py-3.5 bg-black min-h-[60px] border-b border-neutral-900">
       {/* Always Visible: Toggle Sidebar Button & Detailed High-Res LOT Logo */}
       <div className="flex items-center space-x-3.5">
         <button
@@ -38,8 +46,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right side */}
-      <div />
+      {/* Right side: TopAuthBar */}
+      <div className="flex items-center">
+        <TopAuthBar user={user} onOpenAuth={onOpenAuth} onLogout={onLogout} />
+      </div>
     </header>
   );
 };

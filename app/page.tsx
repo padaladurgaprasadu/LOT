@@ -15,6 +15,7 @@ import { ShareModal } from "../components/ShareModal";
 import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
 import { LotCodeModal } from "../components/LotCodeModal";
+import { LotUser, getLocalUser, setLocalUser, supabase } from "@/lib/authClient";
 import {
   DEFAULT_USER,
   getStoredModel,
@@ -127,6 +128,8 @@ export default function Home() {
   const [meetingAssistantOpen, setMeetingAssistantOpen] = useState(false);
   const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authReason, setAuthReason] = useState<string | undefined>();
+  const [user, setUser] = useState<LotUser | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [lotCodeOpen, setLotCodeOpen] = useState(false);
 
@@ -163,6 +166,43 @@ export default function Home() {
     const controller = new AbortController();
 
     setSelectedModel(getStoredModel());
+
+    // Restore local user or Supabase session on mount
+    const local = getLocalUser();
+    if (local) {
+      setUser(local);
+      setUserProfile({
+        id: local.id,
+        name: local.name,
+        email: local.email,
+        isLoggedIn: true,
+      });
+    }
+
+    if (supabase) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (!isMounted) return;
+        if (data?.user) {
+          const supaUser: LotUser = {
+            id: data.user.id,
+            email: data.user.email || "",
+            name:
+              data.user.user_metadata?.full_name ||
+              data.user.email?.split("@")[0] ||
+              "User",
+            plan: "free",
+          };
+          setUser(supaUser);
+          setLocalUser(supaUser);
+          setUserProfile({
+            id: supaUser.id,
+            name: supaUser.name,
+            email: supaUser.email,
+            isLoggedIn: true,
+          });
+        }
+      });
+    }
 
     fetch("/api/auth/me", { signal: controller.signal })
       .then((res) => res.json())
@@ -433,6 +473,18 @@ export default function Home() {
     overrideFocus?: IndustryFocus
   ) => {
     if (!content.trim() && !attachment) return;
+
+    // Gate guests after 5 free prompts
+    const isClient = typeof window !== "undefined";
+    const guestCount = Number(isClient ? localStorage.getItem("lot_guest_count") || "0" : "0");
+    if (!user && !userProfile.isLoggedIn && guestCount >= 5) {
+      setAuthReason("You reached the 5-message guest limit. Sign in for free to continue chatting.");
+      setAuthOpen(true);
+      return;
+    }
+    if (!user && !userProfile.isLoggedIn && isClient) {
+      localStorage.setItem("lot_guest_count", String(guestCount + 1));
+    }
 
     // Detect prompt intent to sync workspace mode automatically
     const lowerContent = content.toLowerCase();
@@ -1038,7 +1090,20 @@ export default function Home() {
       {/* Main Split-Screen Workspace Container */}
       <div className="flex flex-col flex-1 h-full min-w-0 bg-black relative overflow-hidden">
         {/* OS Top Navigation Bar */}
-        <Header isSidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <Header
+          isSidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          user={user}
+          onOpenAuth={() => {
+            setAuthReason(undefined);
+            setAuthOpen(true);
+          }}
+          onLogout={() => {
+            setUser(null);
+            setLocalUser(null);
+            setUserProfile(DEFAULT_USER);
+          }}
+        />
 
         {/* Mobile View Switcher Tabs (< 1024px) */}
         <div className="lg:hidden flex items-center justify-around bg-[#0c0c10] border-b border-zinc-800 p-1.5 shrink-0 z-20">
@@ -1243,7 +1308,20 @@ export default function Home() {
       <AuthModal
         isOpen={authOpen}
         onClose={() => setAuthOpen(false)}
+        reasonMessage={authReason}
         userProfile={userProfile}
+        onSuccess={(loggedUser) => {
+          setUser(loggedUser);
+          setUserProfile({
+            id: loggedUser.id,
+            name: loggedUser.name,
+            email: loggedUser.email,
+            isLoggedIn: true,
+          });
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("lot_guest_count");
+          }
+        }}
         onAuthSuccess={handleUpdateUserProfile}
       />
       <SettingsModal
