@@ -402,7 +402,7 @@ export default function BlackboardLOTWorkspace() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything on the Blackboard..."
+              placeholder="Ask LOT anything..."
               className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none font-mono"
             />
             <button

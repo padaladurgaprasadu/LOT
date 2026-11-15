@@ -328,28 +328,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 pb-2 sm:pb-3 pb-safe">
-      {/* Multi-Mode Selector Pills (Chat, App Preview, PCB EDA, Academic, Action, Python) */}
-      <div className="mb-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 select-none">
-        {MODE_PILLS.map((pill) => {
-          const isActive = selectedMode === pill.id;
-          return (
-            <button
-              key={pill.id}
-              type="button"
-              onClick={() => handlePillClick(pill.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-150 shrink-0 ${
-                isActive
-                  ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
-                  : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80 hover:border-zinc-700/80"
-              }`}
-            >
-              {pill.icon}
-              <span>{pill.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
       {/* Attachment Preview Card if image attached */}
       {attachment && (
         <div className="mb-2 flex items-center space-x-2 bg-[#141417] border border-zinc-800 rounded-xl p-2 max-w-xs animate-in fade-in duration-100">
@@ -565,7 +543,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               ? "Whisper is transcribing audio..."
               : isListening
               ? "Listening continuously... speak freely"
-              : `Ask LOT anything (${MODE_PILLS.find((p) => p.id === selectedMode)?.label || "Chat"} mode)...`
+              : "Ask LOT anything..."
           }
           rows={1}
           className="flex-1 bg-transparent border-0 resize-none text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-0 text-sm leading-relaxed px-2 py-1 max-h-[160px] custom-scrollbar font-sans"

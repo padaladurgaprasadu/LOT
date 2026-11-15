@@ -145,38 +145,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full min-w-0 bg-[#000000] text-white relative overflow-hidden select-text">
-      {/* Top OS Workspace Bar & Canvas Toggle */}
-      <div className="shrink-0 border-b border-zinc-900/90 bg-[#08080a]/95 backdrop-blur-md px-3 sm:px-4 py-2.5 z-10 flex items-center justify-between gap-2">
-        <div className="flex items-center space-x-2.5 min-w-0">
-          <div className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs font-medium text-zinc-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            <span>{MODE_LABEL_MAP[mode] || "Cognitive Chat"}</span>
-          </div>
-          <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline">
-            Active workspace • Switch in side panel
-          </span>
-        </div>
-
-        {onToggleCanvas && (
-          <button
-            type="button"
-            onClick={onToggleCanvas}
-            title={isCanvasVisible ? "Collapse Workspace Canvas" : "Expand Workspace Canvas"}
-            className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors shrink-0 flex items-center gap-1.5 text-xs font-medium"
-          >
-            <span className="hidden sm:inline text-[11px] text-zinc-400">
-              {isCanvasVisible ? "Hide Canvas" : "Show Canvas"}
-            </span>
-            {isCanvasVisible ? (
-              <PanelRightClose className="w-4 h-4 text-blue-400" />
-            ) : (
-              <PanelRight className="w-4 h-4 text-zinc-400" />
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Main Cognitive Message Stream */}
+      {/* Main Cognitive Message Stream (Clean UI with zero clutter) */}
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-4 space-y-4"
