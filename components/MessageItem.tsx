@@ -248,17 +248,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     ? { heroEntity: null, cleanMarkdown: message.content }
     : cleanModelOutput(message.content);
   const normalizedContent = cleanAndNormalizeMarkdown(cleanMarkdown);
-  const effectiveHeroEntity = !isUser ? (heroEntity || message.heroImage?.title || null) : null;
+
+  // Strict rule: Hero images ONLY show when the model explicitly tagged [HERO: Entity Name]
+  // NEVER show for coding, syntax, loops, conditions, algorithms, or technical tutorials.
+  const isExcludedConcept =
+    /\b(code|coding|program|programming|python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|react|vue|angular|nextjs|node|django|flask|loop|for\s+loop|while|if|else|if\s+else|switch|case|function|def|class|variable|array|object|json|api|sdk|algorithm|data\s+structure|git|github|debug|bug|error|exception|syntax|install|import|export|npm|pip|tutorial|how\s+to|what\s+is|explain|write|create|build|make|run|compile|test|math|equation|calculate|formula)\b/i;
+
+  const effectiveHeroEntity =
+    !isUser &&
+    heroEntity &&
+    !isExcludedConcept.test(heroEntity)
+      ? heroEntity
+      : null;
 
   return (
     <div className="w-full py-3 flex flex-col items-start px-3 sm:px-4 max-w-3xl mx-auto animate-in fade-in duration-150">
-      {/* 1. ChatGPT-Style 4-Photo Bento Hero Gallery */}
+      {/* 1. ChatGPT-Style 4-Photo Bento Hero Gallery (Places, Monuments, People, Landmarks only) */}
       {!isUser && effectiveHeroEntity && (
         <HeroImageGallery entity={effectiveHeroEntity} />
       )}
 
-      {/* Fallback to single hero banner only if HeroImageGallery not active and message.heroImage exists */}
-      {!isUser && !effectiveHeroEntity && message.heroImage && message.heroImage.imageUrl && (
+      {/* Fallback to single hero banner only if verified real place/entity and NOT technical */}
+      {!isUser && !effectiveHeroEntity && message.heroImage && message.heroImage.imageUrl && !isExcludedConcept.test(message.heroImage.title) && (
         <div className="mb-4 w-full max-w-sm sm:max-w-md rounded-2xl overflow-hidden border border-zinc-800 bg-[#0e0e11] shadow-xl">
           <div className="relative w-full aspect-[16/10] max-h-56 bg-zinc-900 overflow-hidden">
             <img

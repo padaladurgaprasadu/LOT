@@ -7,12 +7,15 @@ interface HeroImage {
   title: string;
 }
 
+const EXCLUDED_TECHNICAL_PATTERNS =
+  /\b(code|coding|program|programming|python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|react|vue|angular|nextjs|node|django|flask|loop|for\s+loop|while|if|else|if\s+else|switch|case|function|def|class|variable|array|object|json|api|sdk|algorithm|data\s+structure|git|github|debug|bug|error|exception|syntax|install|import|export|npm|pip|tutorial|how\s+to|what\s+is|explain|write|create|build|make|run|compile|test|math|equation|calculate|formula)\b/i;
+
 export function HeroImageGallery({ entity }: { entity: string | null }) {
   const [images, setImages] = useState<HeroImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!entity || !entity.trim()) {
+    if (!entity || !entity.trim() || EXCLUDED_TECHNICAL_PATTERNS.test(entity.trim())) {
       setImages([]);
       return;
     }
@@ -91,7 +94,7 @@ export function HeroImageGallery({ entity }: { entity: string | null }) {
     };
   }, [entity]);
 
-  if (!images.length) return null;
+  if (!entity || !images.length || EXCLUDED_TECHNICAL_PATTERNS.test(entity)) return null;
 
   return (
     <>

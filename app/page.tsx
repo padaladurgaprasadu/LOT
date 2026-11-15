@@ -490,8 +490,6 @@ export default function Home() {
       attachment,
     };
 
-    const isShortEntityQuery = content.trim().split(/\s+/).length <= 4 && !content.includes("```") && content.trim().length > 2;
-
     const assistantMessageId = nextMessageId();
     const initialAssistantMessage: Message = {
       id: assistantMessageId,
@@ -500,15 +498,6 @@ export default function Home() {
       reasoning: "",
       timestamp: Date.now(),
       model: selectedModel,
-      heroImage: isShortEntityQuery
-        ? {
-            title: content.trim(),
-            imageUrl: "",
-            thumbnailUrl: "",
-            description: "",
-            source: "wikipedia",
-          }
-        : undefined,
     };
 
     setConversations((prev) => {
@@ -530,8 +519,13 @@ export default function Home() {
 
     let resolvedHeroData: EntityHeroData | null = null;
 
-    // Entity Hero background check
-    if (content.trim().length > 2 && content.trim().length < 80) {
+    const isTechnicalQuery =
+      /\b(code|coding|program|programming|python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|react|vue|angular|nextjs|node|django|flask|loop|for\s+loop|while|if|else|if\s+else|switch|case|function|def|class|variable|array|object|json|api|sdk|algorithm|data\s+structure|git|github|debug|bug|error|exception|syntax|install|import|export|npm|pip|tutorial|how\s+to|what\s+is|explain|write|create|build|make|run|compile|test|math|equation|calculate|formula)\b/i.test(
+        content.trim()
+      );
+
+    // Entity Hero background check (Only for real physical entities, places, and people — NEVER for code/tech)
+    if (!isTechnicalQuery && content.trim().length > 2 && content.trim().length < 80) {
       fetch("/api/entity-hero", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
