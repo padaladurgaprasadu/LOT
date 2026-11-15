@@ -22,6 +22,7 @@ from app.engines.pcb_engine import pcb_engine
 from app.engines.code_engine import code_engine
 from app.engines.browser_agent import browser_agent
 from app.engines.higgsfield_engine import higgsfield_engine
+from app.engines.lot_nim_router import lot_stream, lot_complete, NIM_CATALOG, INTENT_TO_TIER_MAP
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("LOTMicroKernel")
@@ -148,69 +149,99 @@ async def generate_sse_chat_stream(
         yield f"event: reasoning\ndata: {json.dumps(reasoning_data)}\n\n"
         await asyncio.sleep(0.04)
 
-    # 4. Content streaming
-    content_text = ""
+    # 4. Live NIM Stream with Zero-LiteLLM Routing & Deterministic Artifact Synthesis
+    nim_tier = INTENT_TO_TIER_MAP.get(route.intent, tier if tier in NIM_CATALOG else "flagship")
+    enable_thinking = nim_tier in ["flagship", "orchestrator"] and route.intent != "CHAT"
+    has_nim_key = bool(
+        os.environ.get("NVIDIA_API_KEY")
+        or os.environ.get("NVIDIA_NIM_API_KEY")
+        or os.environ.get("LOT_BACKEND_KEY")
+    )
+
+    streamed_live = False
     artifact_payload = None
 
+    # Detect specialized artifact dock payloads
     if route.intent == "PCB_HARDWARE":
         pcb_res = pcb_engine.synthesize_circuit(last_user_msg)
-        content_text = (
-            f"### {pcb_res.title}\n\n"
-            f"Generated a complete 2-layer electronic design using **tscircuit** React TSX components. "
-            f"The layout has been verified for clearance and manufacturing constraints.\n\n"
-            f"- **Board Dimensions**: {pcb_res.dimensions['width_mm']}mm × {pcb_res.dimensions['height_mm']}mm\n"
-            f"- **Estimated Component Cost**: ${pcb_res.estimated_total_usd:.2f} USD\n"
-            f"- **Layers**: {pcb_res.layer_count} copper layers\n\n"
-            f"The interactive 2D Schematic, PCB Gerber layout, and 3D WebGL RunFrame are mounted in the **Artifact Dock**."
-        )
         artifact_payload = {
             "type": "pcb",
             "payload": pcb_res.model_dump(),
         }
-
     elif route.intent in ["SWE_CODING", "APP_PREVIEW"]:
         code_res = code_engine.synthesize_react_component(last_user_msg)
-        content_text = (
-            f"### Autonomous SWE Synthesis: {code_res.file_path}\n\n"
-            f"Synthesized clean, production-ready React / TypeScript code with Tree-Sitter AST sanitization. "
-            f"Illegal relative parent imports have been eliminated, and type definitions are fully satisfied.\n\n"
-            f"The interactive preview and Sandpack WebContainer environment are now active in the **Artifact Dock**."
-        )
         artifact_payload = {
             "type": "code",
             "payload": code_res.model_dump(),
         }
-
     elif route.intent == "AUTONOMOUS_ACTION":
         browser_res = await browser_agent.stage_order(last_user_msg, session_id=session_id)
         card = browser_res.checkout_card
-        content_text = (
-            f"### Browser-Use CDP Agent: Staged Checkout\n\n"
-            f"{browser_res.step_description}\n\n"
-            f"**Action Card**: {card.title if card else 'Review Order'}\n"
-            f"**Total**: {card.total if card else '$0.00'}\n\n"
-            f"⚠️ **Security Notice**: Paused at Tier 3 Financial Gate. Please review the itemized breakdown in the **Artifact Dock** and authorize payment."
-        )
         artifact_payload = {
             "type": "checkout",
             "payload": card.model_dump() if card else {},
         }
 
-    else:
-        # Default Cognitive Chat
-        content_text = (
-            f"I have processed your request using **{spec.name}** ({spec.parameters}).\n\n"
-            f"All citations have been verified with HTTP status 200 via parallel probes, ensuring zero broken links or hallucinated URLs. "
-            f"You can explore relevant sources in the citation pills above, or select specialized workspace modes from the navigation side panel."
-        )
+    # Attempt direct live stream from NVIDIA NIM
+    if has_nim_key:
+        msg_dicts = [{"role": m.role, "content": m.content} for m in messages]
+        try:
+            async for chunk in lot_stream(
+                messages=msg_dicts,
+                tier=nim_tier,
+                enable_thinking=enable_thinking,
+            ):
+                if chunk["type"] == "thinking":
+                    streamed_live = True
+                    yield f"event: reasoning\ndata: {json.dumps({'token': chunk['content']})}\n\n"
+                elif chunk["type"] == "text":
+                    streamed_live = True
+                    yield f"event: content\ndata: {json.dumps({'token': chunk['content']})}\n\n"
+        except Exception as exc:
+            logger.warning(f"[SSE Stream] Live NIM stream failed: {exc}. Falling back to deterministic synthesizer.")
 
-    # Stream content tokens in chunks
-    words = content_text.split(" ")
-    for i in range(0, len(words), 3):
-        chunk = " ".join(words[i : i + 3]) + " "
-        chunk_data = {"token": chunk}
-        yield f"event: content\ndata: {json.dumps(chunk_data)}\n\n"
-        await asyncio.sleep(0.02)
+    # Offline/Mock fallback when live stream was not dispatched
+    if not streamed_live:
+        content_text = ""
+        if route.intent == "PCB_HARDWARE":
+            content_text = (
+                f"### {artifact_payload['payload']['title']}\n\n"
+                f"Generated a complete 2-layer electronic design using **tscircuit** React TSX components. "
+                f"The layout has been verified for clearance and manufacturing constraints.\n\n"
+                f"- **Board Dimensions**: {artifact_payload['payload']['dimensions']['width_mm']}mm × {artifact_payload['payload']['dimensions']['height_mm']}mm\n"
+                f"- **Estimated Component Cost**: ${artifact_payload['payload']['estimated_total_usd']:.2f} USD\n"
+                f"- **Layers**: {artifact_payload['payload']['layer_count']} copper layers\n\n"
+                f"The interactive 2D Schematic, PCB Gerber layout, and 3D WebGL RunFrame are mounted in the **Artifact Dock**."
+            )
+        elif route.intent in ["SWE_CODING", "APP_PREVIEW"]:
+            content_text = (
+                f"### Autonomous SWE Synthesis: {artifact_payload['payload']['file_path']}\n\n"
+                f"Synthesized clean, production-ready React / TypeScript code with Tree-Sitter AST sanitization. "
+                f"Illegal relative parent imports have been eliminated, and type definitions are fully satisfied.\n\n"
+                f"The interactive preview and Sandpack WebContainer environment are now active in the **Artifact Dock**."
+            )
+        elif route.intent == "AUTONOMOUS_ACTION":
+            card_data = artifact_payload.get("payload", {})
+            content_text = (
+                f"### Browser-Use CDP Agent: Staged Checkout\n\n"
+                f"Autonomous browser agent navigated to merchant checkout.\n\n"
+                f"**Action Card**: {card_data.get('title', 'Review Order')}\n"
+                f"**Total**: {card_data.get('total', '$0.00')}\n\n"
+                f"⚠️ **Security Notice**: Paused at Tier 3 Financial Gate. Please review the itemized breakdown in the **Artifact Dock** and authorize payment."
+            )
+        else:
+            content_text = (
+                f"I have processed your request using **{spec.name}** ({spec.parameters}).\n\n"
+                f"All citations have been verified with HTTP status 200 via parallel probes, ensuring zero broken links or hallucinated URLs. "
+                f"You can explore relevant sources in the citation pills above, or select specialized workspace modes from the navigation side panel."
+            )
+
+        words = content_text.split(" ")
+        for i in range(0, len(words), 3):
+            chunk = " ".join(words[i : i + 3]) + " "
+            chunk_data = {"token": chunk}
+            yield f"event: content\ndata: {json.dumps(chunk_data)}\n\n"
+            await asyncio.sleep(0.02)
 
     # 5. Emit event: artifact if available
     if artifact_payload:
