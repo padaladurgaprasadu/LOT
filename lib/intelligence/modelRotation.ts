@@ -463,6 +463,7 @@ async function callNvidiaNim(
   const rawCandidates = [
     options?.preferredModel,
     "nvidia/nemotron-3-ultra-550b-a55b",
+    "meta/muse-glimmer-30b",
     "poolside/laguna-xs-2.1",
     "minimaxai/minimax-m3.1-flash",
     "google/gemma-4-31b-it",

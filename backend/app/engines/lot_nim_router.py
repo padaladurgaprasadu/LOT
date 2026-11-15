@@ -13,8 +13,9 @@ from openai import AsyncOpenAI, RateLimitError, APIStatusError
 logger = logging.getLogger("LOTNimRouter")
 logger.setLevel(logging.INFO)
 
-# Exact 6 active models from your NVIDIA NIM catalog screenshot (all Free Endpoints)
+# Active models from NVIDIA NIM catalog (all Free Endpoints)
 NIM_CATALOG: Dict[str, str] = {
+    "reasoning": "meta/muse-glimmer-30b",                  # 30B Multimodal Reasoning: Text & Images, Native Tool-Calling & Separate Reasoning
     "flagship": "moonshotai/kimi-k3.1-pro",                 # 3T MoE, 1M context: Flagship Coding, 3D/PCB & Heavy Reasoning
     "orchestrator": "nvidia/nemotron-3-ultra-550b-a55b",     # 550B MoE, 1M context: Primary Agent Orchestrator & Planner
     "flash": "minimaxai/minimax-m3.1-flash",               # Multimodal MoE: Ultra-Fast Daily Chat & Intent Router
@@ -23,7 +24,7 @@ NIM_CATALOG: Dict[str, str] = {
     "dense": "google/gemma-4-31b-it",                      # 31B Dense: Structured Extraction & Lightweight Synthesis
 }
 
-FALLBACK_CHAIN = ["flagship", "orchestrator", "dense", "flash"]
+FALLBACK_CHAIN = ["orchestrator", "reasoning", "terminal", "flash"]
 
 # Subsystem & Intent mapping to NIM Tiers
 INTENT_TO_TIER_MAP: Dict[str, str] = {

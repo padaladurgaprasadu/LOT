@@ -110,15 +110,16 @@ function postCompletion(provider: ProviderConfig, messages: ChatMessage[], opts:
  * Frontier agentic coding models on NVIDIA NIM with 0-downtime failover rotation.
  */
 export const LOT_CODING_MODELS = [
-  "moonshotai/kimi-k3.1-pro",
-  "minimaxai/minimax-m3.1-flash",
-  "nvidia/nemotron-3.5-super-vl-120b-a12b",
-  "poolside/laguna-xs-2.1",
+  "meta/muse-glimmer-30b",
   "nvidia/nemotron-3-ultra-550b-a55b",
+  "poolside/laguna-xs-2.1",
+  "minimaxai/minimax-m3.1-flash",
   "google/gemma-4-31b-it",
+  "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "moonshotai/kimi-k3.1-pro",
 ] as const;
 
-export const LOT_CODE_MODEL = process.env.LOT_CODE_MODEL || "moonshotai/kimi-k3.1-pro";
+export const LOT_CODE_MODEL = process.env.LOT_CODE_MODEL || "meta/muse-glimmer-30b";
 
 export function isModelConfigured(): boolean {
   return Boolean(process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY || process.env.GROQ_API_KEY);
@@ -143,11 +144,13 @@ export async function completeWithModel(messages: ChatMessage[], options: Comple
   if (nvidiaKey) {
     const candidateModels = [
       LOT_CODE_MODEL,
-      "minimaxai/minimax-m3.1-flash",
-      "nvidia/nemotron-3.5-super-vl-120b-a12b",
-      "poolside/laguna-xs-2.1",
+      "meta/muse-glimmer-30b",
       "nvidia/nemotron-3-ultra-550b-a55b",
+      "poolside/laguna-xs-2.1",
+      "minimaxai/minimax-m3.1-flash",
       "google/gemma-4-31b-it",
+      "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "moonshotai/kimi-k3.1-pro",
     ];
 
     for (const model of candidateModels) {

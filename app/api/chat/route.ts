@@ -280,6 +280,7 @@ Follow these strict rules in every response:
               const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
               const candidates = [
                 preferredModel,
+                "meta/muse-glimmer-30b",
                 "nvidia/nemotron-3-ultra-550b-a55b",
                 "poolside/laguna-xs-2.1",
                 "minimaxai/minimax-m3.1-flash",
@@ -332,14 +333,46 @@ Follow these strict rules in every response:
                           try {
                             const parsed = JSON.parse(dataStr);
                             const delta = parsed.choices?.[0]?.delta;
-                            const textChunk = delta?.content || (delta?.reasoning_content && intentClassification.intent === "ACADEMIC_RESEARCH" ? delta.reasoning_content : "");
-                            if (textChunk) {
+                            const contentChunk = delta?.content || "";
+                            const reasoningChunk = delta?.reasoning_content || "";
+
+                            if (reasoningChunk) {
                               streamStarted = true;
-                              accumulatedContent += textChunk;
+                              if (!accumulatedContent.includes("<think>")) {
+                                accumulatedContent += "<think>";
+                                controller.enqueue(
+                                  encoder.encode(
+                                    `data: ${JSON.stringify({
+                                      choices: [{ delta: { content: "<think>" } }],
+                                    })}\n\n`
+                                  )
+                                );
+                              }
+                              accumulatedContent += reasoningChunk;
                               controller.enqueue(
                                 encoder.encode(
                                   `data: ${JSON.stringify({
-                                    choices: [{ delta: { content: textChunk } }],
+                                    choices: [{ delta: { content: reasoningChunk } }],
+                                  })}\n\n`
+                                )
+                              );
+                            } else if (contentChunk) {
+                              streamStarted = true;
+                              if (accumulatedContent.includes("<think>") && !accumulatedContent.includes("</think>")) {
+                                accumulatedContent += "</think>\n\n";
+                                controller.enqueue(
+                                  encoder.encode(
+                                    `data: ${JSON.stringify({
+                                      choices: [{ delta: { content: "</think>\n\n" } }],
+                                    })}\n\n`
+                                  )
+                                );
+                              }
+                              accumulatedContent += contentChunk;
+                              controller.enqueue(
+                                encoder.encode(
+                                  `data: ${JSON.stringify({
+                                    choices: [{ delta: { content: contentChunk } }],
                                   })}\n\n`
                                 )
                               );

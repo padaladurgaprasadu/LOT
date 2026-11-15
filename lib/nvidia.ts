@@ -2,13 +2,31 @@ import { NvidiaModel } from "./types";
 
 export const LOT_MODELS: NvidiaModel[] = [
   {
-    id: "moonshotai/kimi-k3.1-pro",
-    name: "Moonshot Kimi-K3.1-Pro",
-    provider: "Moonshot AI / NVIDIA NIM",
-    description: "3T-class open model with 1M-token context specialized for agentic coding, 3D modeling, and finance.",
-    badge: "3T Coding",
+    id: "meta/muse-glimmer-30b",
+    name: "Meta Muse-Glimmer-30B",
+    provider: "Meta / NVIDIA NIM",
+    description: "Multimodal reasoning model accepting text and images, with native tool-calling and separate reasoning output.",
+    badge: "30B Multimodal Reasoning",
+    contextWindow: "128k",
+    supportsThinking: true,
+  },
+  {
+    id: "nvidia/nemotron-3-ultra-550b-a55b",
+    name: "NVIDIA Nemotron-3-Ultra",
+    provider: "NVIDIA NIM",
+    description: "Open, efficient hybrid Mamba-Transformer MoE with 1M context, excelling in agentic reasoning, coding, planning, tool execution.",
+    badge: "550B Hybrid",
     contextWindow: "1000k",
     supportsThinking: true,
+  },
+  {
+    id: "poolside/laguna-xs-2.1",
+    name: "Poolside Laguna-XS-2.1",
+    provider: "Poolside / NVIDIA NIM",
+    description: "Efficient 33B MoE for local, long-horizon agentic coding, terminal tasks, and self-healing patches.",
+    badge: "33B MoE",
+    contextWindow: "64k",
+    supportsThinking: false,
   },
   {
     id: "minimaxai/minimax-m3.1-flash",
@@ -29,24 +47,6 @@ export const LOT_MODELS: NvidiaModel[] = [
     supportsThinking: true,
   },
   {
-    id: "poolside/laguna-xs-2.1",
-    name: "Poolside Laguna-XS-2.1",
-    provider: "Poolside / NVIDIA NIM",
-    description: "Efficient 33B MoE for local, long-horizon agentic coding, terminal tasks, and self-healing patches.",
-    badge: "33B MoE",
-    contextWindow: "64k",
-    supportsThinking: false,
-  },
-  {
-    id: "nvidia/nemotron-3-ultra-550b-a55b",
-    name: "NVIDIA Nemotron-3-Ultra",
-    provider: "NVIDIA NIM",
-    description: "Open, efficient hybrid Mamba-Transformer MoE with 1M context, excelling in agentic reasoning, coding, planning, tool execution.",
-    badge: "550B Hybrid",
-    contextWindow: "1000k",
-    supportsThinking: true,
-  },
-  {
     id: "google/gemma-4-31b-it",
     name: "Google Gemma-4-31B-IT",
     provider: "Google / NVIDIA NIM",
@@ -55,11 +55,20 @@ export const LOT_MODELS: NvidiaModel[] = [
     contextWindow: "128k",
     supportsThinking: false,
   },
+  {
+    id: "moonshotai/kimi-k3.1-pro",
+    name: "Moonshot Kimi-K3.1-Pro",
+    provider: "Moonshot AI / NVIDIA NIM",
+    description: "3T-class open model with 1M-token context specialized for agentic coding, 3D modeling, and finance.",
+    badge: "3T Coding",
+    contextWindow: "1000k",
+    supportsThinking: true,
+  },
 ];
 
 export const CODING_MODELS = LOT_MODELS;
 
-export const DEFAULT_MODEL_ID = "moonshotai/kimi-k3.1-pro";
+export const DEFAULT_MODEL_ID = "nvidia/nemotron-3-ultra-550b-a55b";
 
 /**
  * LOT AI Sovereign System Prompt v5
