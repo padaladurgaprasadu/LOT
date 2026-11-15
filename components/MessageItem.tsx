@@ -21,9 +21,11 @@ import { Message } from "@/lib/types";
 import { ThreeSceneRunner } from "./ThreeSceneRunner";
 import { DiffViewer } from "./DiffViewer";
 import { auditCodeSecurity, SecurityVulnerability } from "@/lib/security/strixSecurityAuditor";
+import { StreamingText } from "@/components/assistant-ui/elements/streaming-text";
 
 interface MessageItemProps {
   message: Message;
+  isStreaming?: boolean;
   onEditMessage?: (messageId: string, content: string) => void;
   onShareMessage?: (message: Message) => void;
 }
@@ -94,6 +96,7 @@ export function cleanAndNormalizeMarkdown(content: string): string {
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
+  isStreaming = false,
   onEditMessage,
   onShareMessage,
 }) => {
@@ -263,12 +266,47 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           </div>
           <span className="text-zinc-400 font-sans text-xs">Thinking...</span>
         </div>
+      ) : isStreaming && !normalizedContent.includes("```") ? (
+        /* 3. Word-by-word streaming animation with trailing caret & blue tinted words (assistant-ui element) */
+        <div className="w-full text-zinc-200 text-sm leading-relaxed prose-dark break-words font-sans">
+          <StreamingText
+            segments={[{ text: normalizedContent }]}
+            count={normalizedContent.split(/\s+/).filter(Boolean).length}
+            streaming={true}
+          />
+        </div>
       ) : (
-        /* 3. Generating / Content State */
+        /* 4. Generating / Content State */
         <div className="w-full text-zinc-200 text-sm leading-relaxed prose-dark break-words font-sans">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
+              p({ node, children, ...props }) {
+                if (isStreaming) {
+                  const rawString =
+                    typeof children === "string"
+                      ? children
+                      : Array.isArray(children)
+                      ? children.filter((c) => typeof c === "string").join(" ")
+                      : "";
+                  if (rawString) {
+                    const wordsCount = rawString.split(/\s+/).filter(Boolean).length;
+                    return (
+                      <StreamingText
+                        segments={[{ text: rawString }]}
+                        count={wordsCount}
+                        streaming={true}
+                        className="my-2 min-h-0"
+                      />
+                    );
+                  }
+                }
+                return (
+                  <p className="my-2 leading-relaxed text-zinc-200 text-sm" {...props}>
+                    {children}
+                  </p>
+                );
+              },
               blockquote({ node, children, ...props }) {
                 return (
                   <blockquote
@@ -349,13 +387,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <li className="leading-relaxed pl-1" {...props}>
                     {children}
                   </li>
-                );
-              },
-              p({ node, children, ...props }) {
-                return (
-                  <p className="my-2.5 text-zinc-300 leading-relaxed text-xs sm:text-sm" {...props}>
-                    {children}
-                  </p>
                 );
               },
               code({ node, className, children, ...props }) {

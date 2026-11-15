@@ -190,6 +190,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                 <div className="w-full max-w-4xl mx-auto">
                   <MessageItem
                     message={message}
+                    isStreaming={isLastAssistant}
                     onShareMessage={onShareMessage}
                     onEditMessage={onEditMessage}
                   />
