@@ -29,6 +29,7 @@ interface MessageItemProps {
   message: Message;
   userPrompt?: string;
   isStreaming?: boolean;
+  showFollowUps?: boolean;
   onEditMessage?: (messageId: string, content: string) => void;
   onShareMessage?: (message: Message) => void;
   onSelectFollowUp?: (question: string) => void;
@@ -114,6 +115,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   message,
   userPrompt = "",
   isStreaming = false,
+  showFollowUps,
   onEditMessage,
   onShareMessage,
   onSelectFollowUp,
@@ -609,9 +611,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </button>
           </div>
 
-          {/* Clickable Follow-Up Questions at Conclusion */}
-          {!isStreaming && followUps.length > 0 && (
-            <div className="mt-5 pt-3.5 border-t border-neutral-800/80 w-full">
+          {/* Clickable Follow-Up Questions at Conclusion (Only active on latest response before next question) */}
+          {(showFollowUps ?? !isStreaming) && !isStreaming && followUps.length > 0 && (
+            <div className="mt-5 pt-3.5 border-t border-neutral-800/80 w-full animate-in fade-in duration-200">
               <p className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-2">
                 Continue exploring
               </p>
@@ -620,7 +622,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <button
                     key={idx}
                     onClick={() => onSelectFollowUp?.(question)}
-                    className="group flex items-center justify-between w-full text-left px-3.5 py-2.5 rounded-xl bg-neutral-900/70 hover:bg-neutral-800/90 border border-neutral-800 hover:border-neutral-700 text-sm text-neutral-200 transition-all duration-150"
+                    className="group flex items-center justify-between w-full text-left px-3.5 py-2.5 rounded-xl bg-neutral-900/70 hover:bg-neutral-800/90 border border-neutral-800 hover:border-neutral-700 text-sm text-neutral-200 transition-all duration-150 active:scale-[0.99]"
                   >
                     <span>{question}</span>
                     <span className="text-neutral-500 group-hover:text-neutral-200 group-hover:translate-x-0.5 transition-transform ml-3">

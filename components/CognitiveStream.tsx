@@ -177,6 +177,14 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                 ? messages[idx - 1].content
                 : "";
 
+            // Strictly check if a new user question was started after this message
+            const hasSubsequentUser = messages.slice(idx + 1).some((m) => m.role === "user");
+            const isLatestAssistant =
+              message.role === "assistant" &&
+              idx === messages.map((m) => m.role).lastIndexOf("assistant");
+            const showFollowUps =
+              isLatestAssistant && !hasSubsequentUser && !isLoading;
+
             return (
               <div key={message.id} className="w-full space-y-2">
                 {/* Standard Message Item bubble with markdown & hero card */}
@@ -185,6 +193,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                     message={message}
                     userPrompt={userPrompt}
                     isStreaming={isLastAssistant}
+                    showFollowUps={showFollowUps}
                     onShareMessage={onShareMessage}
                     onEditMessage={onEditMessage}
                     onSelectFollowUp={(q) => onSendMessage(q)}
