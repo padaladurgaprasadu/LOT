@@ -553,7 +553,10 @@ export default function Home() {
       // Connect exclusively to unified /api/chat endpoint
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "text/event-stream, application/json",
+        },
         body: JSON.stringify({
           messages: [...currentConv.messages, userMessage].map((m) => ({
             role: m.role,
@@ -564,6 +567,7 @@ export default function Home() {
           customPrompt,
           attachment,
           searchFocus: activeFocus,
+          stream: true,
         }),
         signal: controller.signal,
       });
@@ -582,6 +586,87 @@ export default function Home() {
         throw new Error("No response body received from server");
       }
 
+      const contentType = response.headers.get("content-type") || "";
+
+      // Fast-path handler for direct JSON responses (guarantees zero-hang on non-streaming responses)
+      if (contentType.includes("application/json")) {
+        const json = await response.json();
+        const jsonContent = json.message || "";
+        const jsonReasoning = json.reasoning || "";
+
+        if (json.hero) resolvedHeroData = json.hero;
+        if (json.actionCard) {
+          setCurrentCanvasPayload(json.actionCard);
+          setActiveMode("agent");
+          setIsCanvasVisible(true);
+        }
+        if (json.artifacts) {
+          if (json.artifacts.reactApp) {
+            const code = json.artifacts.reactApp.sanitizedCode || json.artifacts.reactApp.code;
+            setCurrentCanvasPayload({ code, files: { "/App.js": code } });
+            setActiveMode("app");
+            setIsCanvasVisible(true);
+          } else if (json.artifacts.pcbSpec) {
+            setCurrentCanvasPayload(json.artifacts.pcbSpec);
+            setActiveMode("pcb");
+            setIsCanvasVisible(true);
+          } else if (json.artifacts.autonomousAction) {
+            setCurrentCanvasPayload(json.artifacts.autonomousAction);
+            setActiveMode("agent");
+            setIsCanvasVisible(true);
+          }
+        }
+        if (json.intent) {
+          if (json.intent === "APP_PREVIEW") { setActiveMode("app"); setIsCanvasVisible(true); }
+          else if (json.intent === "PCB_HARDWARE") { setActiveMode("pcb"); setIsCanvasVisible(true); }
+          else if (json.intent === "AUTONOMOUS_ACTION") { setActiveMode("agent"); setIsCanvasVisible(true); }
+          else if (json.intent === "MEETING_ASSISTANT") { setActiveMode("meeting"); setIsCanvasVisible(true); }
+          else if (json.intent === "ACADEMIC_RESEARCH") { setActiveMode("academic"); setIsCanvasVisible(true); }
+        }
+
+        setConversations((prev) => {
+          const next = prev.map((c) => {
+            if (c.id !== targetConvId) return c;
+            return {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === assistantMessageId
+                  ? {
+                      ...m,
+                      content: jsonContent || "Hello! I am LOT. How can I assist you today?",
+                      reasoning: jsonReasoning,
+                      heroImage: m.heroImage || resolvedHeroData || undefined,
+                    }
+                  : m
+              ),
+            };
+          });
+          setStoredConversations(next);
+          return next;
+        });
+
+        if (jsonContent) {
+          if (/function\s+App\s*\(|export\s+default\s+function\s+App/i.test(jsonContent)) {
+            const codeMatch = jsonContent.match(/```(?:jsx|tsx|javascript|typescript|react)?\s*([\s\S]*?)```/i);
+            const rawCode = codeMatch ? codeMatch[1].trim() : jsonContent;
+            setCurrentCanvasPayload({ code: rawCode, files: { "/App.js": rawCode } });
+            setActiveMode("app");
+            setIsCanvasVisible(true);
+          } else if (/<board|<resistor|<capacitor|@tscircuit/i.test(jsonContent)) {
+            const pcbMatch = jsonContent.match(/```(?:tsx|jsx|typescript)?\s*([\s\S]*?)```/i);
+            const pcbCode = pcbMatch ? pcbMatch[1].trim() : jsonContent;
+            setCurrentCanvasPayload({ circuitCode: pcbCode });
+            setActiveMode("pcb");
+            setIsCanvasVisible(true);
+          } else if (/biryani|swiggy|zomato/i.test(jsonContent) && /order|status|dispatch/i.test(jsonContent)) {
+            setCurrentCanvasPayload({ type: "food", service: "food_ordering" });
+            setActiveMode("agent");
+            setIsCanvasVisible(true);
+          }
+        }
+        return;
+      }
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let streamedRaw = "";
@@ -590,14 +675,30 @@ export default function Home() {
       const handleLines = (lines: string[]) => {
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith("data:")) continue;
+          if (!trimmed) continue;
 
-          const dataStr = trimmed.replace(/^data:\s*/, "");
-          if (dataStr === "[DONE]") continue;
+          let data: any = null;
+          if (trimmed.startsWith("data:")) {
+            const dataStr = trimmed.replace(/^data:\s*/, "");
+            if (dataStr === "[DONE]") continue;
+            try {
+              data = JSON.parse(dataStr);
+            } catch {
+              continue;
+            }
+          } else if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            try {
+              data = JSON.parse(trimmed);
+            } catch {
+              continue;
+            }
+          } else {
+            continue;
+          }
+
+          if (!data) continue;
 
           try {
-            const data = JSON.parse(dataStr);
-
             // Direct Hero payload
             if (data.hero) {
               resolvedHeroData = data.hero;
@@ -649,8 +750,9 @@ export default function Home() {
             }
 
             const delta = data.choices?.[0]?.delta;
-            if (delta && delta.content) {
-              streamedRaw += delta.content;
+            const chunk = delta?.content ?? data.delta ?? (data.message && !streamedRaw ? data.message : null);
+            if (chunk) {
+              streamedRaw += chunk;
 
               // Extract <think> reasoning traces vs clean content
               const thinkMatch = streamedRaw.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
@@ -699,6 +801,16 @@ export default function Home() {
         handleLines(buffer.split("\n"));
       }
 
+      // If buffer still had raw JSON message or streamedRaw is empty, parse fallback
+      if (!streamedRaw && buffer.trim()) {
+        try {
+          const fallbackData = JSON.parse(buffer.trim());
+          if (fallbackData.message) {
+            streamedRaw = fallbackData.message;
+          }
+        } catch {}
+      }
+
       setConversations((prev) => {
         const next = prev.map((c) => {
           if (c.id !== targetConvId) return c;
@@ -713,7 +825,7 @@ export default function Home() {
                   .trim();
                 return {
                   ...m,
-                  content: finalContent || (finalReasoning ? "(Reasoning complete)" : streamedRaw),
+                  content: finalContent || (finalReasoning ? "(Reasoning complete)" : streamedRaw) || "Hello! I am LOT. How can I assist you today?",
                   reasoning: finalReasoning,
                   heroImage: m.heroImage || resolvedHeroData || undefined,
                 };

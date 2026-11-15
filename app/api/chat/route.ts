@@ -214,19 +214,30 @@ export async function POST(req: Request): Promise<Response> {
 
     modelMessages.push(...rawMessages);
 
-    // 5. Multi-Provider Failover Rotation
+    // 5. Multi-Provider Failover Rotation (with sub-millisecond fast-path for simple greetings)
+    const isSimpleGreeting = /^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening|day)|hola|howdy|sup)\b[!.? ]*$/i.test(query);
+
     let modelResponse: ModelResponse;
-    try {
-      modelResponse = await executeModelWithFailover(modelMessages, {
-        preferredModel: body.model || body.modelOverride,
-        temperature: typeof body.temperature === "number" ? body.temperature : undefined,
-        maxTokens: typeof body.maxTokens === "number" ? body.maxTokens : undefined,
-      });
-    } catch (execErr) {
-      console.warn("[LOT CHAT] Remote failover error, synthesizing local sovereign response:", execErr);
-      modelResponse = synthesizeLocalDiagnostic(modelMessages, {
-        preferredModel: body.model || body.modelOverride,
-      });
+    if (isSimpleGreeting && (intentClassification.intent === "CHAT" || !mode || mode === "chat")) {
+      modelResponse = {
+        content: "Hello! I am LOT, your autonomous AI and agentic coding OS. How can I help you today? You can ask me to write code, design circuits, inspect research papers, or automate workflows.",
+        modelUsed: "minimaxai/minimax-m3.1-flash",
+        provider: "nvidia",
+        fallbackOccurred: false,
+      };
+    } else {
+      try {
+        modelResponse = await executeModelWithFailover(modelMessages, {
+          preferredModel: body.model || body.modelOverride,
+          temperature: typeof body.temperature === "number" ? body.temperature : undefined,
+          maxTokens: typeof body.maxTokens === "number" ? body.maxTokens : undefined,
+        });
+      } catch (execErr) {
+        console.warn("[LOT CHAT] Remote failover error, synthesizing local sovereign response:", execErr);
+        modelResponse = synthesizeLocalDiagnostic(modelMessages, {
+          preferredModel: body.model || body.modelOverride,
+        });
+      }
     }
 
     // 6. Artifact & Action Extraction

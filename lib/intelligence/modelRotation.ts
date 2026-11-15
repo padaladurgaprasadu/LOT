@@ -460,21 +460,27 @@ async function callNvidiaNim(
   if (!apiKey || apiKey.trim().length === 0) return null;
   if (!globalModelHealthRegistry.isHealthy("nvidia")) return null;
 
-  const candidateModels = [
+  const rawCandidates = [
     options?.preferredModel,
+    "minimaxai/minimax-m3.1-flash",
     "moonshotai/kimi-k3.1-pro",
     "nvidia/nemotron-3-ultra-550b-a55b",
-    "nvidia/nemotron-3.5-super-vl-120b-a12b",
-    "minimaxai/minimax-m3.1-flash",
-    "poolside/laguna-xs-2.1",
     "google/gemma-4-31b-it",
+    "poolside/laguna-xs-2.1",
+    "nvidia/nemotron-3.5-super-vl-120b-a12b",
     "deepseek-ai/deepseek-r1",
     "meta/llama-3.3-70b-instruct",
   ].filter(Boolean) as string[];
 
-  for (const model of candidateModels) {
+  // Deduplicate while preserving priority
+  const candidateModels = Array.from(new Set(rawCandidates));
+
+  for (let i = 0; i < candidateModels.length; i++) {
+    const model = candidateModels[i];
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    // Allow preferred model up to 15s; subsequent fallbacks 8s for swift rotation
+    const timeoutDuration = i === 0 ? 15000 : 8000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
     try {
       const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
@@ -536,7 +542,7 @@ async function callGroq(
 
   for (const model of candidateModels) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -599,7 +605,7 @@ async function callOpenRouter(
 
   for (const model of candidateModels) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
