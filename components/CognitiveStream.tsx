@@ -175,17 +175,6 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
 
             return (
               <div key={message.id} className="w-full space-y-2">
-                {/* Thinking Block Trace (DeepSeek-R1 / Qwen / Nemotron) */}
-                {message.role === "assistant" && message.reasoning && (
-                  <div className="w-full max-w-4xl mx-auto">
-                    <ThinkingBlock
-                      reasoning={message.reasoning}
-                      isStreaming={isLastAssistant}
-                      defaultOpen={isLastAssistant}
-                    />
-                  </div>
-                )}
-
                 {/* Standard Message Item bubble with markdown & hero card */}
                 <div className="w-full max-w-4xl mx-auto">
                   <MessageItem

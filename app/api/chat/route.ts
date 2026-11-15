@@ -205,7 +205,11 @@ Follow these strict rules in every response:
    - If no Verified URL is available in context, only mention well-known main domains (like https://github.com or https://react.dev) without deep paths.
 
 3. CONCISE & ACCURATE:
-   - Keep answers sharp, factual, and strictly grounded in real-world knowledge.`;
+   - Keep answers sharp, factual, and strictly grounded in real-world knowledge.
+
+4. HERO IMAGE RULE:
+   - If the user asks about a real-world place, city, temple, monument, famous person, historical event, animal, or dish, ALWAYS output \`[HERO: Canonical English Name]\` on the very first line before your heading (e.g. \`[HERO: Tirupati]\`, \`[HERO: A. P. J. Abdul Kalam]\`).
+   - Do NOT output \`[HERO: ...]\` for coding, math, or general conversation.`;
 
     // Append formatted grounding snippets to LLM context with sources and citations
     const modelMessages: Array<{ role: string; content: string }> = [];
@@ -332,47 +336,16 @@ Follow these strict rules in every response:
 
                           try {
                             const parsed = JSON.parse(dataStr);
-                            const delta = parsed.choices?.[0]?.delta;
-                            const contentChunk = delta?.content || "";
-                            const reasoningChunk = delta?.reasoning_content || "";
+                            // ONLY read delta.content — ignore delta.reasoning_content completely (zero thinking delay)
+                            const textChunk = parsed.choices?.[0]?.delta?.content || "";
 
-                            if (reasoningChunk) {
+                            if (textChunk) {
                               streamStarted = true;
-                              if (!accumulatedContent.includes("<think>")) {
-                                accumulatedContent += "<think>";
-                                controller.enqueue(
-                                  encoder.encode(
-                                    `data: ${JSON.stringify({
-                                      choices: [{ delta: { content: "<think>" } }],
-                                    })}\n\n`
-                                  )
-                                );
-                              }
-                              accumulatedContent += reasoningChunk;
+                              accumulatedContent += textChunk;
                               controller.enqueue(
                                 encoder.encode(
                                   `data: ${JSON.stringify({
-                                    choices: [{ delta: { content: reasoningChunk } }],
-                                  })}\n\n`
-                                )
-                              );
-                            } else if (contentChunk) {
-                              streamStarted = true;
-                              if (accumulatedContent.includes("<think>") && !accumulatedContent.includes("</think>")) {
-                                accumulatedContent += "</think>\n\n";
-                                controller.enqueue(
-                                  encoder.encode(
-                                    `data: ${JSON.stringify({
-                                      choices: [{ delta: { content: "</think>\n\n" } }],
-                                    })}\n\n`
-                                  )
-                                );
-                              }
-                              accumulatedContent += contentChunk;
-                              controller.enqueue(
-                                encoder.encode(
-                                  `data: ${JSON.stringify({
-                                    choices: [{ delta: { content: contentChunk } }],
+                                    choices: [{ delta: { content: textChunk } }],
                                   })}\n\n`
                                 )
                               );

@@ -490,6 +490,8 @@ export default function Home() {
       attachment,
     };
 
+    const isShortEntityQuery = content.trim().split(/\s+/).length <= 4 && !content.includes("```") && content.trim().length > 2;
+
     const assistantMessageId = nextMessageId();
     const initialAssistantMessage: Message = {
       id: assistantMessageId,
@@ -498,6 +500,15 @@ export default function Home() {
       reasoning: "",
       timestamp: Date.now(),
       model: selectedModel,
+      heroImage: isShortEntityQuery
+        ? {
+            title: content.trim(),
+            imageUrl: "",
+            thumbnailUrl: "",
+            description: "",
+            source: "wikipedia",
+          }
+        : undefined,
     };
 
     setConversations((prev) => {

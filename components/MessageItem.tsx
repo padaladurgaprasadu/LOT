@@ -22,6 +22,8 @@ import { ThreeSceneRunner } from "./ThreeSceneRunner";
 import { DiffViewer } from "./DiffViewer";
 import { auditCodeSecurity, SecurityVulnerability } from "@/lib/security/strixSecurityAuditor";
 import { StreamingText } from "@/components/assistant-ui/elements/streaming-text";
+import { HeroImageGallery } from "./HeroImageGallery";
+import { cleanModelOutput } from "./cleanModelOutput";
 
 interface MessageItemProps {
   message: Message;
@@ -33,6 +35,18 @@ interface MessageItemProps {
 export function cleanAndNormalizeMarkdown(content: string): string {
   if (!content) return "";
   let formatted = content;
+
+  // 0a. Strip <think>...</think> blocks completely (even while streaming)
+  formatted = formatted
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*/gi, "")
+    .trim();
+
+  // 0b. Extract/Strip [HERO: Entity Name] tag if present
+  formatted = formatted.replace(/^\[HERO:\s*(.+?)\]\s*/im, "").trim();
+
+  // 0c. Fix broken leading bold asterisks like "Tirupati (Tirumala)**" -> "**Tirupati (Tirumala)**"
+  formatted = formatted.replace(/^([A-Za-z0-9][^\n*]{1,60})\*\*/m, "**$1**");
 
   // 0. Strip opening echo heading — model sometimes starts with a heading that is
   //    EXACTLY a generic word like "## Greeting", "## Answer", "## Response".
@@ -230,12 +244,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     (/\b(PRISM|Silicon|GPU|TPU|Die Stack|3D|Three\.js|HBM|WebGL)\b/i.test(message.content) &&
       !message.content.includes("```"));
 
-  const normalizedContent = cleanAndNormalizeMarkdown(message.content);
+  const { heroEntity, cleanMarkdown } = isUser
+    ? { heroEntity: null, cleanMarkdown: message.content }
+    : cleanModelOutput(message.content);
+  const normalizedContent = cleanAndNormalizeMarkdown(cleanMarkdown);
+  const effectiveHeroEntity = !isUser ? (heroEntity || message.heroImage?.title || null) : null;
 
   return (
     <div className="w-full py-3 flex flex-col items-start px-3 sm:px-4 max-w-3xl mx-auto animate-in fade-in duration-150">
-      {/* 1. Guaranteed High-Definition Entity Hero Banner at Top of Context */}
-      {message.heroImage && message.heroImage.imageUrl && (
+      {/* 1. ChatGPT-Style 4-Photo Bento Hero Gallery */}
+      {!isUser && effectiveHeroEntity && (
+        <HeroImageGallery entity={effectiveHeroEntity} />
+      )}
+
+      {/* Fallback to single hero banner only if HeroImageGallery not active and message.heroImage exists */}
+      {!isUser && !effectiveHeroEntity && message.heroImage && message.heroImage.imageUrl && (
         <div className="mb-4 w-full max-w-sm sm:max-w-md rounded-2xl overflow-hidden border border-zinc-800 bg-[#0e0e11] shadow-xl">
           <div className="relative w-full aspect-[16/10] max-h-56 bg-zinc-900 overflow-hidden">
             <img
