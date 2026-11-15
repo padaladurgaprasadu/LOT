@@ -37,6 +37,7 @@ export interface Conversation {
   projectId?: string;
   modelId: string;
   summary?: string;
+  rollingSummary?: string;
 }
 
 export interface ScheduledTask {

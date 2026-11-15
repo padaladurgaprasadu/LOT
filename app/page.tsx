@@ -16,6 +16,8 @@ import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
 import { LotCodeModal } from "../components/LotCodeModal";
 import { LotUser, getLocalUser, setLocalUser, supabase } from "@/lib/authClient";
+import { saveChatSession, deleteChatSession } from "@/lib/chatStorage";
+import { pushSessionToCloud, deleteSessionFromCloud, syncAllSessionsWithCloud } from "@/lib/cloudSync";
 import {
   DEFAULT_USER,
   getStoredModel,
@@ -252,6 +254,20 @@ export default function Home() {
     };
   }, []);
 
+  // Trigger two-way local-first cloud sync automatically whenever a user logs in
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
+    syncAllSessionsWithCloud(user.id).then((synced) => {
+      if (!isMounted || synced.length === 0) return;
+      setConversations(synced as any);
+      setStoredConversations(synced as any);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
   // Split-Screen Drag Separator Listeners
   const handleSeparatorMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -345,6 +361,8 @@ export default function Home() {
     const updated = conversations.filter((c) => c.id !== id);
     setConversations(updated);
     setStoredConversations(updated);
+    deleteChatSession(id);
+    deleteSessionFromCloud(id, user?.id);
     if (activeConvId === id) {
       const nextId = updated.length > 0 ? updated[0].id : null;
       setActiveConvId(nextId);
@@ -358,6 +376,11 @@ export default function Home() {
     );
     setConversations(updated);
     setStoredConversations(updated);
+    const renamed = updated.find((c) => c.id === id);
+    if (renamed) {
+      saveChatSession(renamed as any);
+      pushSessionToCloud(renamed as any, user?.id);
+    }
   };
 
   const handleUpdateModel = (modelId: string) => {
@@ -453,6 +476,11 @@ export default function Home() {
         return { ...c, messages: truncated };
       });
       setStoredConversations(next);
+      const sessionAfterUser = next.find((c) => c.id === activeConvId);
+      if (sessionAfterUser) {
+        saveChatSession(sessionAfterUser as any);
+        pushSessionToCloud(sessionAfterUser as any, user?.id);
+      }
       return next;
     });
     handleSendMessage(newContent);
@@ -562,6 +590,11 @@ export default function Home() {
         };
       });
       setStoredConversations(next);
+      const sessionAfterUser = next.find((c) => c.id === targetConvId);
+      if (sessionAfterUser) {
+        saveChatSession(sessionAfterUser as any);
+        pushSessionToCloud(sessionAfterUser as any, user?.id);
+      }
       return next;
     });
 
@@ -940,6 +973,11 @@ export default function Home() {
           };
         });
         setStoredConversations(next);
+        const completedSession = next.find((c) => c.id === targetConvId);
+        if (completedSession) {
+          saveChatSession(completedSession as any);
+          pushSessionToCloud(completedSession as any, user?.id);
+        }
         return next;
       });
 
