@@ -311,18 +311,21 @@ export async function POST(req: Request): Promise<Response> {
               );
             }
 
-            // Stream content chunks
+            // Progressive token-by-token streaming with natural pacing
             const content = modelResponse.content;
-            const chunkSize = 24;
-            for (let i = 0; i < content.length; i += chunkSize) {
-              const chunk = content.slice(i, i + chunkSize);
+            const tokens = content.match(/\S+\s*/g) || [content];
+            // Adaptive pacing: 22ms for short conversational replies, 12ms for large code/blocks
+            const pacingMs = tokens.length > 150 ? 10 : tokens.length > 60 ? 16 : 22;
+
+            for (const token of tokens) {
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
-                    choices: [{ delta: { content: chunk } }],
+                    choices: [{ delta: { content: token } }],
                   })}\n\n`
                 )
               );
+              await new Promise((resolve) => setTimeout(resolve, pacingMs));
             }
 
             // Emit artifacts

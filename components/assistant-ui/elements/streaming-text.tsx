@@ -1,8 +1,8 @@
 "use client";
 
-import { type ComponentProps, useMemo } from "react";
+import { type ComponentProps, useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { take } from "../utils/range";
+import { take, clamp } from "../utils/range";
 
 export interface Segment {
   text: string;
@@ -28,17 +28,37 @@ export function StreamingText({
       segments.flatMap((segment) =>
         segment.text
           .split(" ")
+          .filter(Boolean)
           .map((word) => ({ word, mono: segment.mono ?? false })),
       ),
     [segments],
   );
-  const shown = take(words, count);
+
+  const targetCount = clamp(count, 0, words.length);
+  const [displayCount, setDisplayCount] = useState<number>(streaming ? 1 : targetCount);
+
+  useEffect(() => {
+    if (!streaming) {
+      setDisplayCount(targetCount);
+      return;
+    }
+
+    if (displayCount < targetCount) {
+      const step = Math.max(1, Math.floor((targetCount - displayCount) / 8));
+      const timer = setTimeout(() => {
+        setDisplayCount((prev) => Math.min(targetCount, prev + step));
+      }, 20);
+      return () => clearTimeout(timer);
+    }
+  }, [displayCount, targetCount, streaming]);
+
+  const shown = take(words, streaming ? displayCount : targetCount);
 
   return (
     <p
       data-slot="streaming-text"
       className={cn(
-        "min-h-[1.5rem] max-w-none text-sm leading-relaxed text-pretty text-zinc-200",
+        "min-h-[1.5rem] max-w-none text-sm leading-relaxed whitespace-pre-wrap text-pretty text-zinc-200",
         className,
       )}
       {...props}
@@ -48,11 +68,11 @@ export function StreamingText({
         return (
           <span
             key={i}
-            className="fade-in animate-in fill-mode-both duration-500 motion-reduce:animate-none"
+            className="fade-in animate-in fill-mode-both duration-300 motion-reduce:animate-none inline"
           >
             <span
               className={cn(
-                "transition-colors duration-700 motion-reduce:transition-none",
+                "transition-colors duration-700 motion-reduce:transition-none inline",
                 fresh ? "text-blue-500 dark:text-blue-400 font-medium" : "text-zinc-200",
                 isMono &&
                   "bg-white/[0.08] rounded-md px-1.5 py-0.5 font-mono text-[0.85em] text-cyan-300",
