@@ -25,6 +25,7 @@ export interface Message {
   model?: string;
   heroImage?: EntityHeroData;
   attachment?: Attachment;
+  followUps?: string[];
 }
 
 export interface Conversation {
@@ -35,6 +36,7 @@ export interface Conversation {
   updatedAt: number;
   projectId?: string;
   modelId: string;
+  summary?: string;
 }
 
 export interface ScheduledTask {

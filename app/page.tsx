@@ -569,6 +569,7 @@ export default function Home() {
             role: m.role,
             content: m.content,
           })),
+          summary: currentConv.summary || "",
           model: selectedModel,
           mode: activeMode,
           customPrompt,
@@ -602,6 +603,11 @@ export default function Home() {
         const jsonReasoning = json.reasoning || "";
 
         if (json.hero) resolvedHeroData = json.hero;
+        if (json.summary) {
+          setConversations((prev) =>
+            prev.map((c) => (c.id === targetConvId ? { ...c, summary: json.summary } : c))
+          );
+        }
         if (json.actionCard) {
           setCurrentCanvasPayload(json.actionCard);
           setActiveMode("agent");
@@ -755,6 +761,13 @@ export default function Home() {
             // Direct Hero payload
             if (data.hero) {
               resolvedHeroData = data.hero;
+            }
+
+            // Rolling Context Summary payload from server
+            if (data.summary) {
+              setConversations((prev) =>
+                prev.map((c) => (c.id === targetConvId ? { ...c, summary: data.summary } : c))
+              );
             }
 
             // Direct ActionCard payload from server

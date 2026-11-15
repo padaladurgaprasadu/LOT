@@ -16,8 +16,9 @@ export function cleanModelOutput(
 ): {
   heroEntity: string | null;
   cleanMarkdown: string;
+  followUps: string[];
 } {
-  if (!rawText) return { heroEntity: null, cleanMarkdown: "" };
+  if (!rawText) return { heroEntity: null, cleanMarkdown: "", followUps: [] };
 
   // 1. Strip <think>...</think> blocks completely
   let text = rawText
@@ -45,7 +46,7 @@ export function cleanModelOutput(
     }
   }
 
-  // 3. HARD GUARDRAIL: Never show hero images if user prompt or entity is coding/how-to
+  // Guardrail: Never show hero images if user prompt or entity is coding/technical
   if (
     heroEntity &&
     (NON_VISUAL_QUERY_REGEX.test(userPrompt) ||
@@ -54,8 +55,23 @@ export function cleanModelOutput(
     heroEntity = null;
   }
 
-  // 4. Fix broken leading bold asterisks
+  // 3. Extract complete [FOLLOWUPS: Q1 | Q2 | Q3] tag
+  let followUps: string[] = [];
+  const followUpMatch = text.match(/\[FOLLOWUPS:\s*([^\]]+)\]/i);
+  if (followUpMatch) {
+    followUps = followUpMatch[1]
+      .split("|")
+      .map((q) => q.trim())
+      .filter((q) => q.length > 3)
+      .slice(0, 3);
+    text = text.replace(followUpMatch[0], "").trim();
+  }
+
+  // 4. Hide incomplete [FOLLOWUPS:... tag while tokens are still streaming
+  text = text.replace(/\[FOLLOWUPS:[\s\S]*$/i, "").trim();
+
+  // 5. Fix broken leading bold asterisks
   text = text.replace(/^([A-Za-z0-9][^\n*]{1,60})\*\*/m, "**$1**");
 
-  return { heroEntity, cleanMarkdown: text };
+  return { heroEntity, cleanMarkdown: text, followUps };
 }

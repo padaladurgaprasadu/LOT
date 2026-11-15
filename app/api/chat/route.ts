@@ -41,6 +41,8 @@ import {
   PcbSpecification,
   AutonomousActionPayload,
 } from "@/lib/agents/lotCodeEngine";
+import OpenAI from "openai";
+import { buildInfiniteContext } from "@/lib/contextManager";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +58,8 @@ export interface ChatApiRequest {
   customPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  summary?: string;
+  existingSummary?: string;
 }
 
 export interface ChatApiResponse {
@@ -64,6 +68,7 @@ export interface ChatApiResponse {
   modelUsed: string;
   provider: string;
   searchResults?: WebSearchResult[];
+  summary?: string;
   artifacts?: {
     reactApp?: ReactAppArtifact | null;
     pcbSpec?: PcbSpecification | null;
@@ -209,18 +214,18 @@ Follow these strict rules in every response:
 
 4. HERO IMAGE RULE (STRICT):
    - ONLY if the user is specifically asking about a real-world geographical PLACE (city, temple, state, country), a famous PERSON, a physical MONUMENT/LANDMARK, an ANIMAL, or a FOOD DISH, output \`[HERO: PLACE | Canonical Name]\` (or \`PERSON\`, \`MONUMENT\`, \`ANIMAL\`, \`DISH\`) on the very first line (e.g. \`[HERO: PLACE | Tirupati]\`, \`[HERO: PERSON | A. P. J. Abdul Kalam]\`).
-   - NEVER output a \`[HERO: ...]\` tag for programming, coding (\`for loop\`, \`if else\`, \`Python\`, etc.), software, tutorials (\`how to...\`), math, science concepts, or general chat.`;
+   - NEVER output a \`[HERO: ...]\` tag for programming, coding (\`for loop\`, \`if else\`, \`Python\`, etc.), software, tutorials (\`how to...\`), math, science concepts, or general chat.
 
-    // Append formatted grounding snippets to LLM context with sources and citations
-    const modelMessages: Array<{ role: string; content: string }> = [];
+5. FOLLOW-UP QUESTIONS RULE:
+   - At the very end of EVERY response, after your conclusion, always provide exactly 3 short, smart follow-up questions that the user might want to ask next to go deeper into the topic.
+   - Format them strictly on the final line like this:
+   [FOLLOWUPS: First follow-up question? | Second follow-up question? | Third follow-up question?]`;
 
-    modelMessages.push({
-      role: "system",
-      content: body.customPrompt && typeof body.customPrompt === "string"
-        ? `${masterSystemPrompt}\n\n[USER CUSTOM INSTRUCTION]:\n${body.customPrompt}`
-        : masterSystemPrompt,
-    });
+    const baseSystemPrompt = body.customPrompt && typeof body.customPrompt === "string"
+      ? `${masterSystemPrompt}\n\n[USER CUSTOM INSTRUCTION]:\n${body.customPrompt}`
+      : masterSystemPrompt;
 
+    let groundingSystemContent = "";
     if (searchResults && searchResults.length > 0) {
       const groundingSnippet = searchResults
         .map(
@@ -229,13 +234,27 @@ Follow these strict rules in every response:
         )
         .join("\n\n");
 
-      modelMessages.push({
-        role: "system",
-        content: `[VERIFIED REAL-TIME GROUNDING - USE ONLY THESE EXACT URLS IF LINKS ARE NEEDED]:\n${groundingSnippet}\n\nStrictly adhere to the verified URLs above. NEVER invent or hallucinate URLs.`,
-      });
+      groundingSystemContent = `\n\n[VERIFIED REAL-TIME GROUNDING - USE ONLY THESE EXACT URLS IF LINKS ARE NEEDED]:\n${groundingSnippet}\n\nStrictly adhere to the verified URLs above. NEVER invent or hallucinate URLs.`;
     }
 
-    modelMessages.push(...rawMessages);
+    const fullSystemPrompt = baseSystemPrompt + groundingSystemContent;
+
+    const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
+    const openaiClient = apiKey
+      ? new OpenAI({
+          baseURL: "https://integrate.api.nvidia.com/v1",
+          apiKey: apiKey.trim(),
+        })
+      : null;
+
+    const { optimizedMessages, updatedSummary } = await buildInfiniteContext(
+      openaiClient,
+      fullSystemPrompt,
+      rawMessages as any,
+      body.summary || body.existingSummary || ""
+    );
+
+    const modelMessages = optimizedMessages;
 
     // 5. Streaming vs Non-Streaming Execution Pipeline
     const isSimpleGreeting = /^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening|day)|hola|howdy|sup)\b[!.? ]*$/i.test(query);
@@ -258,6 +277,7 @@ Follow these strict rules in every response:
                   model: preferredModel,
                   provider: "nvidia",
                   searchResults: searchResults || [],
+                  summary: updatedSummary,
                 })}\n\n`
               )
             );
@@ -508,6 +528,7 @@ Follow these strict rules in every response:
       modelUsed: modelResponse.modelUsed,
       provider: modelResponse.provider,
       searchResults: searchResults || [],
+      summary: updatedSummary,
       artifacts,
     };
 

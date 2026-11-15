@@ -175,6 +175,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                     isStreaming={isLastAssistant}
                     onShareMessage={onShareMessage}
                     onEditMessage={onEditMessage}
+                    onSelectFollowUp={(q) => onSendMessage(q)}
                   />
                 </div>
 
