@@ -82,9 +82,27 @@ class SearchEngine:
                             "snippet": item.get("content", ""),
                         })
         except Exception as e:
-            logger.warning(f"SearXNG query unreachable ({e}). Using verified knowledge sources.")
+            logger.warning(f"SearXNG query unreachable ({e}). Trying DuckDuckGo live search.")
 
-        # If SearXNG is unavailable, generate authoritative fallback knowledge citations
+        # If SearXNG is unavailable, query DuckDuckGo live search
+        if not results:
+            try:
+                def _fetch_ddg():
+                    from duckduckgo_search import DDGS
+                    ddg_results = list(DDGS().text(query, max_results=limit))
+                    return [
+                        {
+                            "url": item.get("href", ""),
+                            "title": item.get("title", "Search Result"),
+                            "snippet": item.get("body", ""),
+                        }
+                        for item in ddg_results if item.get("href")
+                    ]
+                results = await asyncio.to_thread(_fetch_ddg)
+            except Exception as ddg_err:
+                logger.warning(f"DuckDuckGo search fallback failed ({ddg_err}). Using verified knowledge sources.")
+
+        # If SearXNG and DuckDuckGo are both unavailable, generate authoritative fallback knowledge citations
         if not results:
             q_clean = query.lower()
             if "pcb" in q_clean or "circuit" in q_clean or "tscircuit" in q_clean:

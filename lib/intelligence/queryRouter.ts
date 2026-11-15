@@ -194,6 +194,11 @@ export function checkRequiresWebSearch(query: string, intent: QueryIntent): bool
     return true;
   }
 
+  // Queries asking for links, URLs, documentation, repositories, or official sites
+  if (/\b(links?|urls?|websites?|official\s+(site|page|doc|docs|documentation|link)|github\s+repo|documentation)\b/i.test(clean)) {
+    return true;
+  }
+
   // Real-time queries, current events, recent developments
   if (/\b(latest|current|breaking|recent|news|today|update|price|stock|election|weather|release\s+date|who\s+won)\b/i.test(clean)) {
     return true;

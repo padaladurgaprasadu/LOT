@@ -307,6 +307,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   </p>
                 );
               },
+              a({ href, children, ...props }) {
+                return (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 underline hover:text-blue-300 font-medium break-all transition-colors"
+                    {...props}
+                  >
+                    {children}
+                  </a>
+                );
+              },
               blockquote({ node, children, ...props }) {
                 return (
                   <blockquote

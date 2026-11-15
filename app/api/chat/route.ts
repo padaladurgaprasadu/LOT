@@ -188,27 +188,46 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
+    // Master System Prompt (Guarantees Sharp Answers + Zero URL Hallucinations)
+    const masterSystemPrompt = `You are LOT, an elite AI assistant and agentic coding OS.
+Follow these strict rules in every response:
+
+1. STRUCTURE & QUALITY:
+   - Start directly with a clear, high-value, structured answer.
+   - Use clean Markdown: bold key terms, structured bullet points, and numbered steps.
+   - For code, always write complete, production-ready code inside language-tagged code blocks (e.g. \`\`\`python, \`\`\`tsx).
+
+2. STRICT URL & LINK RULES (NO BROKEN OR HALLUCINATED LINKS):
+   - NEVER invent, guess, or construct URLs from memory.
+   - ONLY use the exact "Verified URL" provided in the [VERIFIED REAL-TIME GROUNDING] section.
+   - Format every link strictly as clean Markdown: [Source Name](https://exact-verified-url.com)
+   - Never put punctuation (dots, commas, brackets) immediately touching a raw URL.
+   - If no Verified URL is available in context, only mention well-known main domains (like https://github.com or https://react.dev) without deep paths.
+
+3. CONCISE & ACCURATE:
+   - Keep answers sharp, factual, and strictly grounded in real-world knowledge.`;
+
     // Append formatted grounding snippets to LLM context with sources and citations
     const modelMessages: Array<{ role: string; content: string }> = [];
 
-    if (body.customPrompt && typeof body.customPrompt === "string") {
-      modelMessages.push({
-        role: "system",
-        content: body.customPrompt,
-      });
-    }
+    modelMessages.push({
+      role: "system",
+      content: body.customPrompt && typeof body.customPrompt === "string"
+        ? `${masterSystemPrompt}\n\n[USER CUSTOM INSTRUCTION]:\n${body.customPrompt}`
+        : masterSystemPrompt,
+    });
 
     if (searchResults && searchResults.length > 0) {
       const groundingSnippet = searchResults
         .map(
           (res, idx) =>
-            `[Source ${idx + 1} (${res.source})]: ${res.title}\nURL: ${res.url}\n${res.snippet}`
+            `Title: ${res.title}\nVerified URL: ${res.url}\nSnippet: ${res.snippet}`
         )
         .join("\n\n");
 
       modelMessages.push({
         role: "system",
-        content: `[VERIFIED REAL-TIME GROUNDING FOR: "${query}"]:\n${groundingSnippet}\n\nUse the above verified live search data as authoritative ground truth. Include source citations where relevant.`,
+        content: `[VERIFIED REAL-TIME GROUNDING - USE ONLY THESE EXACT URLS IF LINKS ARE NEEDED]:\n${groundingSnippet}\n\nStrictly adhere to the verified URLs above. NEVER invent or hallucinate URLs.`,
       });
     }
 
@@ -221,7 +240,7 @@ export async function POST(req: Request): Promise<Response> {
     if (isSimpleGreeting && (intentClassification.intent === "CHAT" || !mode || mode === "chat")) {
       modelResponse = {
         content: "Hello! I am LOT, your autonomous AI and agentic coding OS. How can I help you today? You can ask me to write code, design circuits, inspect research papers, or automate workflows.",
-        modelUsed: "minimaxai/minimax-m3.1-flash",
+        modelUsed: "meta/llama-3.3-70b-instruct",
         provider: "nvidia",
         fallbackOccurred: false,
       };
@@ -229,8 +248,8 @@ export async function POST(req: Request): Promise<Response> {
       try {
         modelResponse = await executeModelWithFailover(modelMessages, {
           preferredModel: body.model || body.modelOverride,
-          temperature: typeof body.temperature === "number" ? body.temperature : undefined,
-          maxTokens: typeof body.maxTokens === "number" ? body.maxTokens : undefined,
+          temperature: typeof body.temperature === "number" ? body.temperature : 0.3,
+          maxTokens: typeof body.maxTokens === "number" ? body.maxTokens : 4096,
         });
       } catch (execErr) {
         console.warn("[LOT CHAT] Remote failover error, synthesizing local sovereign response:", execErr);
