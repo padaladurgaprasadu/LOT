@@ -39,21 +39,6 @@ export interface ChatInputProps {
   onSelectMode?: (mode: string) => void;
 }
 
-interface ModePill {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-}
-
-const MODE_PILLS: ModePill[] = [
-  { id: "chat", label: "Chat", icon: <MessageSquare className="w-3 h-3 text-blue-400" /> },
-  { id: "app", label: "App Preview", icon: <Code2 className="w-3 h-3 text-emerald-400" /> },
-  { id: "pcb", label: "PCB EDA", icon: <Cpu className="w-3 h-3 text-purple-400" /> },
-  { id: "academic", label: "Academic", icon: <GraduationCap className="w-3 h-3 text-amber-400" /> },
-  { id: "agent", label: "Action", icon: <Bot className="w-3 h-3 text-cyan-400" /> },
-  { id: "python", label: "Python", icon: <Terminal className="w-3 h-3 text-rose-400" /> },
-];
-
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   isLoading,
@@ -72,7 +57,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<string>(activeMode);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
@@ -81,12 +65,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const baseInputRef = useRef<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  useEffect(() => {
-    if (activeMode) {
-      setSelectedMode(activeMode);
-    }
-  }, [activeMode]);
 
   // Sync external input and focus
   useEffect(() => {
@@ -316,13 +294,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setInternalFocus(focus);
     if (onSearchFocusChange) {
       onSearchFocusChange(focus);
-    }
-  };
-
-  const handlePillClick = (modeId: string) => {
-    setSelectedMode(modeId);
-    if (onSelectMode) {
-      onSelectMode(modeId);
     }
   };
 
