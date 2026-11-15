@@ -549,6 +549,8 @@ export default function Home() {
         .catch(() => {});
     }
 
+    let pacerInterval: any = null;
+
     try {
       // Connect exclusively to unified /api/chat endpoint
       const response = await fetch("/api/chat", {
@@ -672,6 +674,52 @@ export default function Home() {
       let streamedRaw = "";
       let buffer = "";
 
+      // Smooth Pacer Queue State (Maintains smooth 25ms human reading pace, absorbs GPU token bursts)
+      let incomingTokenQueue = "";
+      let displayedContent = "";
+      let pacerActive = true;
+      let networkDone = false;
+
+      pacerInterval = setInterval(() => {
+        if (!pacerActive) return;
+
+        if (incomingTokenQueue.length > 0) {
+          // Dynamic step: 2 to 6 characters per tick (smoothly accelerates when buffer grows, never falls behind)
+          const step = Math.max(2, Math.min(8, Math.ceil(incomingTokenQueue.length / 15)));
+          const slice = incomingTokenQueue.slice(0, step);
+          incomingTokenQueue = incomingTokenQueue.slice(step);
+          displayedContent += slice;
+
+          const thinkMatch = displayedContent.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
+          const extractedReasoning = thinkMatch ? thinkMatch[1].trim() : "";
+          const cleanContent = displayedContent
+            .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
+            .trimStart();
+
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id !== targetConvId) return c;
+              return {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === assistantMessageId
+                    ? {
+                        ...m,
+                        content: cleanContent || (extractedReasoning ? "" : displayedContent),
+                        reasoning: extractedReasoning || m.reasoning,
+                        heroImage: m.heroImage || resolvedHeroData || undefined,
+                      }
+                    : m
+                ),
+              };
+            })
+          );
+        } else if (networkDone) {
+          clearInterval(pacerInterval);
+          pacerActive = false;
+        }
+      }, 25);
+
       const handleLines = (lines: string[]) => {
         for (const line of lines) {
           const trimmed = line.trim();
@@ -753,32 +801,8 @@ export default function Home() {
             const chunk = delta?.content ?? data.delta ?? (data.message && !streamedRaw ? data.message : null);
             if (chunk) {
               streamedRaw += chunk;
-
-              // Extract <think> reasoning traces vs clean content
-              const thinkMatch = streamedRaw.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
-              const extractedReasoning = data.reasoning || (thinkMatch ? thinkMatch[1].trim() : "");
-              const cleanContent = streamedRaw
-                .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
-                .trimStart();
-
-              setConversations((prev) =>
-                prev.map((c) => {
-                  if (c.id !== targetConvId) return c;
-                  return {
-                    ...c,
-                    messages: c.messages.map((m) =>
-                      m.id === assistantMessageId
-                        ? {
-                            ...m,
-                            content: cleanContent || (extractedReasoning ? "" : streamedRaw),
-                            reasoning: extractedReasoning,
-                            heroImage: m.heroImage || resolvedHeroData || undefined,
-                          }
-                        : m
-                    ),
-                  };
-                })
-              );
+              // Push incoming network chunk into smooth pacer queue
+              incomingTokenQueue += chunk;
             }
           } catch {
             // ignore chunk parse boundary
@@ -807,9 +831,20 @@ export default function Home() {
           const fallbackData = JSON.parse(buffer.trim());
           if (fallbackData.message) {
             streamedRaw = fallbackData.message;
+            incomingTokenQueue += fallbackData.message;
           }
         } catch {}
       }
+
+      // Signal network completion and wait for pacer queue to drain smoothly
+      networkDone = true;
+      let drainWaitMs = 0;
+      while (incomingTokenQueue.length > 0 && pacerActive && drainWaitMs < 5000) {
+        await new Promise((r) => setTimeout(r, 25));
+        drainWaitMs += 25;
+      }
+      clearInterval(pacerInterval);
+      pacerActive = false;
 
       setConversations((prev) => {
         const next = prev.map((c) => {
@@ -877,6 +912,7 @@ export default function Home() {
         );
       }
     } finally {
+      if (pacerInterval) clearInterval(pacerInterval);
       setIsLoading(false);
       abortControllerRef.current = null;
     }

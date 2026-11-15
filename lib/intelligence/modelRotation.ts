@@ -462,15 +462,12 @@ async function callNvidiaNim(
 
   const rawCandidates = [
     options?.preferredModel,
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
-    "minimaxai/minimax-m3.1-flash",
-    "moonshotai/kimi-k3.1-pro",
     "nvidia/nemotron-3-ultra-550b-a55b",
-    "google/gemma-4-31b-it",
     "poolside/laguna-xs-2.1",
+    "minimaxai/minimax-m3.1-flash",
+    "google/gemma-4-31b-it",
     "nvidia/nemotron-3.5-super-vl-120b-a12b",
-    "deepseek-ai/deepseek-r1",
+    "moonshotai/kimi-k3.1-pro",
   ].filter(Boolean) as string[];
 
   // Deduplicate while preserving priority

@@ -233,14 +233,211 @@ Follow these strict rules in every response:
 
     modelMessages.push(...rawMessages);
 
-    // 5. Multi-Provider Failover Rotation (with sub-millisecond fast-path for simple greetings)
+    // 5. Streaming vs Non-Streaming Execution Pipeline
     const isSimpleGreeting = /^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening|day)|hola|howdy|sup)\b[!.? ]*$/i.test(query);
+    const isStreaming = body.stream === true || req.headers.get("accept") === "text/event-stream";
 
+    // Fast-path: True Instant SSE Stream with Zero 45-second Buffering
+    if (isStreaming) {
+      const preferredModel = body.model || body.modelOverride || "nvidia/nemotron-3-ultra-550b-a55b";
+      const encoder = new TextEncoder();
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            // 1. Emit metadata immediately (browser receives first packet in < 10ms)
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "metadata",
+                  intent: intentClassification.intent,
+                  model: preferredModel,
+                  provider: "nvidia",
+                  searchResults: searchResults || [],
+                })}\n\n`
+              )
+            );
+
+            let accumulatedContent = "";
+
+            if (isSimpleGreeting && (intentClassification.intent === "CHAT" || !mode || mode === "chat")) {
+              const greetingText = "Hello! I am LOT, your autonomous AI and agentic coding OS. How can I help you today? You can ask me to write code, design circuits, inspect research papers, or automate workflows.";
+              const words = greetingText.split(" ");
+              for (const word of words) {
+                const token = word + " ";
+                accumulatedContent += token;
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      choices: [{ delta: { content: token } }],
+                    })}\n\n`
+                  )
+                );
+                await new Promise((r) => setTimeout(r, 20));
+              }
+            } else {
+              // Direct NVIDIA NIM Real-Time Streaming
+              const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
+              const candidates = [
+                preferredModel,
+                "nvidia/nemotron-3-ultra-550b-a55b",
+                "poolside/laguna-xs-2.1",
+                "minimaxai/minimax-m3.1-flash",
+              ].filter(Boolean);
+
+              let streamStarted = false;
+
+              if (apiKey && apiKey.trim().length > 0) {
+                for (const candidate of candidates) {
+                  if (streamStarted) break;
+                  try {
+                    const nimController = new AbortController();
+                    const timeoutId = setTimeout(() => nimController.abort(), 12000);
+
+                    const nimRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${apiKey.trim()}`,
+                      },
+                      body: JSON.stringify({
+                        model: candidate,
+                        messages: modelMessages,
+                        temperature: typeof body.temperature === "number" ? body.temperature : 0.3,
+                        max_tokens: typeof body.maxTokens === "number" ? body.maxTokens : 4096,
+                        stream: true,
+                      }),
+                      signal: nimController.signal,
+                    }).finally(() => clearTimeout(timeoutId));
+
+                    if (nimRes.ok && nimRes.body) {
+                      const reader = nimRes.body.getReader();
+                      const decoder = new TextDecoder();
+                      let sseBuffer = "";
+
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        sseBuffer += decoder.decode(value, { stream: true });
+                        const lines = sseBuffer.split("\n");
+                        sseBuffer = lines.pop() || "";
+
+                        for (const line of lines) {
+                          const trimmed = line.trim();
+                          if (!trimmed || !trimmed.startsWith("data: ")) continue;
+                          const dataStr = trimmed.replace(/^data:\s*/, "");
+                          if (dataStr === "[DONE]") continue;
+
+                          try {
+                            const parsed = JSON.parse(dataStr);
+                            const delta = parsed.choices?.[0]?.delta;
+                            const textChunk = delta?.content || (delta?.reasoning_content && intentClassification.intent === "ACADEMIC_RESEARCH" ? delta.reasoning_content : "");
+                            if (textChunk) {
+                              streamStarted = true;
+                              accumulatedContent += textChunk;
+                              controller.enqueue(
+                                encoder.encode(
+                                  `data: ${JSON.stringify({
+                                    choices: [{ delta: { content: textChunk } }],
+                                  })}\n\n`
+                                )
+                              );
+                            }
+                          } catch {}
+                        }
+                      }
+                      if (streamStarted) break;
+                    }
+                  } catch (candidateErr) {
+                    console.warn(`[LOT CHAT] Upstream candidate ${candidate} failed:`, candidateErr);
+                  }
+                }
+              }
+
+              // Fallback to local diagnostic synthesizer if remote didn't stream
+              if (!streamStarted) {
+                const fallbackResponse = synthesizeLocalDiagnostic(modelMessages, { preferredModel });
+                accumulatedContent = fallbackResponse.content;
+                const tokens = accumulatedContent.match(/\S+\s*/g) || [accumulatedContent];
+                for (const t of tokens) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        choices: [{ delta: { content: t } }],
+                      })}\n\n`
+                    )
+                  );
+                  await new Promise((r) => setTimeout(r, 20));
+                }
+              }
+            }
+
+            // 2. Extract artifacts and emit actionCard / artifacts after text stream completes
+            let reactApp: ReactAppArtifact | null = null;
+            let pcbSpec: PcbSpecification | null = null;
+            let autonomousAction: AutonomousActionPayload | null = null;
+
+            try { reactApp = extractReactArtifact(accumulatedContent); } catch {}
+            try { pcbSpec = extractPcbSpecification(accumulatedContent); } catch {}
+            try { autonomousAction = extractAutonomousAction(accumulatedContent); } catch {}
+
+            if (autonomousAction) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "actionCard",
+                    actionCard: autonomousAction,
+                  })}\n\n`
+                )
+              );
+            }
+
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "artifacts",
+                  artifacts: {
+                    reactApp: reactApp || null,
+                    pcbSpec: pcbSpec || null,
+                    autonomousAction: autonomousAction || null,
+                  },
+                })}\n\n`
+              )
+            );
+
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch (streamErr) {
+            console.error("[LOT CHAT] Streaming pipeline error:", streamErr);
+            try { controller.close(); } catch {}
+          }
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          ...rateHeaders,
+          "X-Session-Id": sessionId,
+          "X-LOT-Model": preferredModel,
+          "X-LOT-Provider": "nvidia",
+          "X-LOT-Intent": intentClassification.intent,
+          "X-LOT-Latency-Ms": String(Date.now() - reqStart),
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
+    // Non-Streaming Path (Used for direct API calls, tests, & webhooks)
     let modelResponse: ModelResponse;
     if (isSimpleGreeting && (intentClassification.intent === "CHAT" || !mode || mode === "chat")) {
       modelResponse = {
         content: "Hello! I am LOT, your autonomous AI and agentic coding OS. How can I help you today? You can ask me to write code, design circuits, inspect research papers, or automate workflows.",
-        modelUsed: "meta/llama-3.3-70b-instruct",
+        modelUsed: "nvidia/nemotron-3-ultra-550b-a55b",
         provider: "nvidia",
         fallbackOccurred: false,
       };
@@ -259,7 +456,7 @@ Follow these strict rules in every response:
       }
     }
 
-    // 6. Artifact & Action Extraction
+    // 6. Artifact & Action Extraction (Non-Streaming)
     let reactApp: ReactAppArtifact | null = null;
     let pcbSpec: PcbSpecification | null = null;
     let autonomousAction: AutonomousActionPayload | null = null;
@@ -288,7 +485,7 @@ Follow these strict rules in every response:
       autonomousAction: autonomousAction || null,
     };
 
-    // 7. Deterministic Response Construction
+    // 7. Deterministic JSON Response Construction
     const responseHeaders: Record<string, string> = {
       ...rateHeaders,
       "X-Session-Id": sessionId,
@@ -297,88 +494,6 @@ Follow these strict rules in every response:
       "X-LOT-Intent": intentClassification.intent,
       "X-LOT-Latency-Ms": String(Date.now() - reqStart),
     };
-
-    const isStreaming = body.stream === true || req.headers.get("accept") === "text/event-stream";
-
-    if (isStreaming) {
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            // Emit metadata
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "metadata",
-                  intent: intentClassification.intent,
-                  model: modelResponse.modelUsed,
-                  provider: modelResponse.provider,
-                  searchResults: searchResults || [],
-                })}\n\n`
-              )
-            );
-
-            // Emit actionCard if present
-            if (autonomousAction) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "actionCard",
-                    actionCard: autonomousAction,
-                  })}\n\n`
-                )
-              );
-            }
-
-            // Progressive token-by-token streaming with natural pacing
-            const content = modelResponse.content;
-            const tokens = content.match(/\S+\s*/g) || [content];
-            // Adaptive pacing: 22ms for short conversational replies, 12ms for large code/blocks
-            const pacingMs = tokens.length > 150 ? 10 : tokens.length > 60 ? 16 : 22;
-
-            for (const token of tokens) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    choices: [{ delta: { content: token } }],
-                  })}\n\n`
-                )
-              );
-              await new Promise((resolve) => setTimeout(resolve, pacingMs));
-            }
-
-            // Emit artifacts
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "artifacts",
-                  artifacts,
-                })}\n\n`
-              )
-            );
-
-            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            controller.close();
-          } catch (streamErr) {
-            console.error("[LOT CHAT] Streaming pipeline error:", streamErr);
-            try {
-              controller.close();
-            } catch {}
-          }
-        },
-      });
-
-      return new Response(stream, {
-        status: 200,
-        headers: {
-          ...responseHeaders,
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-          "X-Accel-Buffering": "no",
-        },
-      });
-    }
 
     // Clean JSON Response
     const responsePayload: ChatApiResponse = {
