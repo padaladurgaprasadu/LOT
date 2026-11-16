@@ -613,6 +613,29 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <ThumbsDown className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Clickable Follow-Up Questions at Conclusion (Clean text links without box containers) */}
+          {(showFollowUps ?? !isStreaming) && !isStreaming && followUps.length > 0 && (
+            <div className="mt-5 pt-3.5 border-t border-neutral-900 w-full animate-in fade-in duration-200">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500 mb-1.5">
+                Continue exploring
+              </p>
+              <div className="flex flex-col gap-0.5 w-full">
+                {followUps.map((question, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => onSelectFollowUp?.(question)}
+                    className="group flex items-center justify-between w-full text-left py-1.5 px-0 text-sm text-neutral-400 hover:text-white transition-colors duration-150 focus:outline-none"
+                  >
+                    <span className="group-hover:underline underline-offset-4">{question}</span>
+                    <span className="text-neutral-600 group-hover:text-neutral-300 group-hover:translate-x-1 transition-all ml-3 shrink-0">
+                      →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@
 import React from "react";
 import { PanelLeft } from "lucide-react";
 import { LotUser } from "@/lib/authClient";
+import { TopAuthBar } from "./TopAuthBar";
 
 interface HeaderProps {
   isSidebarOpen: boolean;
@@ -43,6 +44,11 @@ export const Header: React.FC<HeaderProps> = ({
             LOT
           </span>
         </div>
+      </div>
+
+      {/* Right side: TopAuthBar */}
+      <div className="flex items-center">
+        <TopAuthBar user={user} onOpenAuth={onOpenAuth} onLogout={onLogout} />
       </div>
     </header>
   );

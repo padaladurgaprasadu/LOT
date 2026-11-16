@@ -53,16 +53,16 @@ export function TopAuthBar({ user, onOpenAuth, onLogout }: TopAuthBarProps) {
 
   return (
     <div className="relative" ref={menuRef}>
-      {/* Top right corner: Just three dots */}
+      {/* Top right corner: Three dots without box container */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label="Account and Profile options"
         aria-expanded={isOpen}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:text-white hover:bg-neutral-800 hover:border-neutral-700 transition active:scale-95 focus:outline-none"
+        className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-900/50 transition-colors focus:outline-none active:scale-95 flex items-center justify-center"
         title="Account & Profile"
       >
-        <MoreVertical className="w-4 h-4" />
+        <MoreVertical className="w-5 h-5" />
       </button>
 
       {/* Profile Details Dropdown */}
