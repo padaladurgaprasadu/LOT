@@ -13,6 +13,9 @@ import { ShareModal } from "../components/ShareModal";
 import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
 import { LotCodeModal } from "../components/LotCodeModal";
+import { LotAgentIDE } from "../components/LotAgentIDE";
+import { AgentFile, AgentStep } from "@/lib/lotSuperAgent";
+import { FileDiffRecord, parseLiveAgentStream } from "@/lib/agentPatcher";
 import { LotUser, getLocalUser, setLocalUser, supabase } from "@/lib/authClient";
 import { saveChatSession, deleteChatSession } from "@/lib/chatStorage";
 import { pushSessionToCloud, deleteSessionFromCloud, syncAllSessionsWithCloud } from "@/lib/cloudSync";
@@ -78,6 +81,11 @@ export default function Home() {
 
   // LOT-OS Conversation Mode State
   const [activeMode, setActiveMode] = useState<LotOsMode>("chat");
+
+  // LOT Super-Agent Closed-Loop IDE State
+  const [agentFiles, setAgentFiles] = useState<Record<string, AgentFile>>({});
+  const [agentDiffs, setAgentDiffs] = useState<FileDiffRecord[]>([]);
+  const [agentPlanSteps, setAgentPlanSteps] = useState<AgentStep[]>([]);
 
   // Streaming generation state
   const [isLoading, setIsLoading] = useState(false);
@@ -211,6 +219,9 @@ export default function Home() {
     setSidebarOpen(false);
     clearInputDraft(activeConvId);
     setInputDraft("");
+    setAgentFiles({});
+    setAgentDiffs([]);
+    setAgentPlanSteps([]);
   };
 
   const handleDeleteConversation = (id: string) => {
@@ -493,26 +504,47 @@ export default function Home() {
     let pacerInterval: any = null;
 
     try {
-      // Connect exclusively to unified /api/chat endpoint
-      const response = await fetch("/api/chat", {
+      // Check if this is an autonomous coding agent query or self-healing patch
+      const isCodingAgentQuery =
+        content.startsWith("[AUTONOMOUS SELF-HEAL]") ||
+        /\b(build|create|code|make|develop|implement)\s+(a|an)?\s*(app|web\s*app|game|tool|timer|calculator|dashboard|site|website|ui|component|page|project)\b/i.test(
+          content
+        ) ||
+        content.includes("<lotDiff>") ||
+        content.includes("<lotFile>") ||
+        Object.keys(agentFiles).length > 0;
+
+      const endpoint = isCodingAgentQuery ? "/api/agent" : "/api/chat";
+      const requestBody = isCodingAgentQuery
+        ? {
+            messages: [...currentConv.messages, userMessage].map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            files: agentFiles,
+          }
+        : {
+            messages: [...currentConv.messages, userMessage].map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            summary: currentConv.summary || "",
+            model: selectedModel,
+            mode: activeMode,
+            customPrompt,
+            attachment,
+            searchFocus: activeFocus,
+            stream: true,
+          };
+
+      // Connect to unified /api/chat or specialized /api/agent
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "text/event-stream, application/json",
         },
-        body: JSON.stringify({
-          messages: [...currentConv.messages, userMessage].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          summary: currentConv.summary || "",
-          model: selectedModel,
-          mode: activeMode,
-          customPrompt,
-          attachment,
-          searchFocus: activeFocus,
-          stream: true,
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
 
@@ -618,11 +650,36 @@ export default function Home() {
           incomingTokenQueue = incomingTokenQueue.slice(step);
           displayedContent += slice;
 
+          // Parse live agent stream for Super-Agent IDE
+          if (
+            displayedContent.includes("<lotPlan>") ||
+            displayedContent.includes("<lotFile>") ||
+            displayedContent.includes("<lotDiff>")
+          ) {
+            const parsed = parseLiveAgentStream(displayedContent, agentFiles);
+            if (Object.keys(parsed.updatedFiles).length > 0) {
+              setAgentFiles(parsed.updatedFiles);
+            }
+            if (parsed.diffs.length > 0) {
+              setAgentDiffs(parsed.diffs);
+            }
+            if (parsed.planSteps.length > 0) {
+              setAgentPlanSteps(parsed.planSteps);
+            }
+          }
+
           const thinkMatch = displayedContent.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
           const extractedReasoning = thinkMatch ? thinkMatch[1].trim() : "";
-          const cleanContent = displayedContent
-            .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
-            .trimStart();
+          const isAgentMarkup =
+            displayedContent.includes("<lotPlan>") ||
+            displayedContent.includes("<lotFile>") ||
+            displayedContent.includes("<lotDiff>");
+
+          const cleanContent = isAgentMarkup
+            ? parseLiveAgentStream(displayedContent, agentFiles).cleanChatText
+            : displayedContent
+                .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
+                .trimStart();
 
           setConversations((prev) =>
             prev.map((c) => {
@@ -669,6 +726,9 @@ export default function Home() {
               continue;
             }
           } else {
+            // Raw text chunk fallback
+            streamedRaw += trimmed + "\n";
+            incomingTokenQueue += trimmed + "\n";
             continue;
           }
 
@@ -776,9 +836,15 @@ export default function Home() {
               if (m.id === assistantMessageId) {
                 const thinkMatch = streamedRaw.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
                 const finalReasoning = thinkMatch ? thinkMatch[1].trim() : m.reasoning || "";
-                const finalContent = streamedRaw
-                  .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
-                  .trim();
+                const isAgentMarkup =
+                  streamedRaw.includes("<lotPlan>") ||
+                  streamedRaw.includes("<lotFile>") ||
+                  streamedRaw.includes("<lotDiff>");
+                const finalContent = isAgentMarkup
+                  ? parseLiveAgentStream(streamedRaw, agentFiles).cleanChatText
+                  : streamedRaw
+                      .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
+                      .trim();
                 return {
                   ...m,
                   content: finalContent || (finalReasoning ? "(Reasoning complete)" : streamedRaw) || "Hello! I am LOT. How can I assist you today?",
@@ -798,6 +864,24 @@ export default function Home() {
         }
         return next;
       });
+
+      // Ensure final files are parsed into workspace
+      if (
+        streamedRaw.includes("<lotPlan>") ||
+        streamedRaw.includes("<lotFile>") ||
+        streamedRaw.includes("<lotDiff>")
+      ) {
+        const parsed = parseLiveAgentStream(streamedRaw, agentFiles);
+        if (Object.keys(parsed.updatedFiles).length > 0) {
+          setAgentFiles(parsed.updatedFiles);
+        }
+        if (parsed.diffs.length > 0) {
+          setAgentDiffs(parsed.diffs);
+        }
+        if (parsed.planSteps.length > 0) {
+          setAgentPlanSteps(parsed.planSteps);
+        }
+      }
 
       // Maintain active mode classification without side canvas
       const finalClean = streamedRaw.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
@@ -880,36 +964,67 @@ export default function Home() {
           }}
         />
 
-        {/* Pure Full-Width Cognitive Stream */}
-        <main className="flex-1 flex flex-col min-h-0 w-full overflow-hidden relative">
-          <WorkspaceErrorBoundary
-            fallbackTitle="Cognitive Stream Recovered"
-            onReset={() => {
-              setActiveConvId(null);
-              setStoredCurrentConvId(null);
-            }}
-          >
-            <CognitiveStream
-              mode={activeMode}
-              onSelectMode={handleSelectMode}
-              messages={
-                activeConversation && Array.isArray(activeConversation.messages)
-                  ? activeConversation.messages.filter(Boolean)
-                  : []
-              }
-              isLoading={isLoading}
-              userProfile={userProfile}
-              onSendMessage={handleSendMessage}
-              onStopGeneration={handleStopGeneration}
-              onEditMessage={handleEditMessage}
-              onShareMessage={() => setShareOpen(true)}
-              searchFocus={searchFocus}
-              onSearchFocusChange={setSearchFocus}
-              onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
-              onOpenLotCode={() => setLotCodeOpen(true)}
-              inputDraft={inputDraft}
+        {/* Main Cognitive & Super-Agent Workspace */}
+        <main className="flex-1 flex flex-row min-h-0 w-full overflow-hidden relative">
+          <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden">
+            <WorkspaceErrorBoundary
+              fallbackTitle="Cognitive Stream Recovered"
+              onReset={() => {
+                setActiveConvId(null);
+                setStoredCurrentConvId(null);
+              }}
+            >
+              <CognitiveStream
+                mode={activeMode}
+                onSelectMode={handleSelectMode}
+                messages={
+                  activeConversation && Array.isArray(activeConversation.messages)
+                    ? activeConversation.messages.filter(Boolean)
+                    : []
+                }
+                isLoading={isLoading}
+                userProfile={userProfile}
+                onSendMessage={handleSendMessage}
+                onStopGeneration={handleStopGeneration}
+                onEditMessage={handleEditMessage}
+                onShareMessage={() => setShareOpen(true)}
+                searchFocus={searchFocus}
+                onSearchFocusChange={setSearchFocus}
+                onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
+                onOpenLotCode={() => setLotCodeOpen(true)}
+                inputDraft={inputDraft}
+              />
+            </WorkspaceErrorBoundary>
+          </div>
+
+          {/* LOT Super-Agent Closed-Loop IDE Workspace */}
+          {(Object.keys(agentFiles).length > 0 || agentPlanSteps.length > 0) && (
+            <LotAgentIDE
+              files={agentFiles}
+              diffs={agentDiffs}
+              planSteps={agentPlanSteps}
+              isStreaming={isLoading}
+              onUpdateFile={(path, content) => {
+                setAgentFiles((prev) => ({
+                  ...prev,
+                  [path]: {
+                    path,
+                    content,
+                    language: path.split(".").pop() || "html",
+                    lastModified: Date.now(),
+                  },
+                }));
+              }}
+              onTriggerAutoHeal={(autoHealPrompt) => {
+                handleSendMessage(autoHealPrompt);
+              }}
+              onClose={() => {
+                setAgentFiles({});
+                setAgentPlanSteps([]);
+                setAgentDiffs([]);
+              }}
             />
-          </WorkspaceErrorBoundary>
+          )}
         </main>
       </div>
 
