@@ -23,6 +23,7 @@ import {
   UtensilsCrossed,
   Cpu,
   Code2,
+  Globe,
 } from "lucide-react";
 
 const MODE_LABEL_MAP: Record<LotOsMode, string> = {
@@ -58,12 +59,21 @@ export interface CognitiveStreamProps {
  * Extracts action payloads or code intent from message text if present.
  */
 function extractActionPreview(content: string): {
-  type: "food" | "write" | "command" | "pcb" | "app";
+  type: "food" | "write" | "command" | "pcb" | "app" | "browser";
   title: string;
   summary: string;
   rawPayload?: any;
 } | null {
   if (!content) return null;
+
+  // 0. Browser-Use Autonomous Agent block
+  if (/browser-use|browser_action|\[BROWSER_SESSION\]|cdp chromium|navigate to/i.test(content)) {
+    return {
+      type: "browser",
+      title: "Browser-Use Autonomous Agent",
+      summary: "Chromium CDP agent executing visual DOM actions with 3-Tier HITL gate",
+    };
+  }
 
   // 1. Food action (Biryani / Swiggy / Zomato / Food Ordering)
   if (
@@ -223,6 +233,8 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                             <Cpu className="w-4 h-4 text-cyan-400" />
                           ) : actionPreview.type === "app" ? (
                             <Code2 className="w-4 h-4 text-blue-400" />
+                          ) : actionPreview.type === "browser" ? (
+                            <Globe className="w-4 h-4 text-cyan-400" />
                           ) : (
                             <Bot className="w-4 h-4 text-purple-400" />
                           )}

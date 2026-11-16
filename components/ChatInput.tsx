@@ -480,6 +480,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   </button>
                 )}
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInput("Navigate and execute browser-use task on: ");
+                    setPlusMenuOpen(false);
+                    textareaRef.current?.focus();
+                  }}
+                  className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
+                >
+                  <Globe className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Browser Agent (browser-use)</span>
+                </button>
+
                 {onOpenScheduleTasks && (
                   <button
                     onClick={() => {
