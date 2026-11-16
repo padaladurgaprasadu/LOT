@@ -5,6 +5,7 @@ import {
   isSupabaseConfigured,
   LotUser,
   setLocalUser,
+  extractFirstName,
 } from "@/lib/authClient";
 
 interface AuthModalProps {
@@ -55,10 +56,11 @@ export function AuthModal({
   };
 
   const loginLocally = () => {
+    const cleanName = name || extractFirstName(null, email) || "Prasad";
     const fallbackUser: LotUser = {
       id: crypto.randomUUID(),
       email: email || "user@lot.local",
-      name: name || (email ? email.split("@")[0] : "LOT Sovereign User"),
+      name: cleanName,
       plan: "free",
     };
     setLocalUser(fallbackUser);
@@ -81,10 +83,11 @@ export function AuthModal({
     try {
       if (isSupabaseConfigured && supabase) {
         if (mode === "signup") {
+          const cleanName = name || extractFirstName(null, email) || "Prasad";
           const { data, error: signUpErr } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { full_name: name || email.split("@")[0] } },
+            options: { data: { full_name: cleanName } },
           });
           if (signUpErr) throw signUpErr;
 
@@ -92,7 +95,7 @@ export function AuthModal({
             const loggedUser: LotUser = {
               id: data.user.id,
               email: data.user.email || email,
-              name: name || email.split("@")[0],
+              name: cleanName,
               plan: "free",
             };
             setLocalUser(loggedUser);
@@ -114,11 +117,14 @@ export function AuthModal({
           if (signInErr) throw signInErr;
 
           if (data.user) {
+            const cleanName =
+              data.user.user_metadata?.full_name ||
+              extractFirstName(null, email) ||
+              "Prasad";
             const loggedUser: LotUser = {
               id: data.user.id,
               email: data.user.email || email,
-              name:
-                data.user.user_metadata?.full_name || email.split("@")[0],
+              name: cleanName,
               plan: "free",
             };
             setLocalUser(loggedUser);

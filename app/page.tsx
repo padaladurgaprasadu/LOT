@@ -16,7 +16,7 @@ import { LotCodeModal } from "../components/LotCodeModal";
 import { LotAgentIDE } from "../components/LotAgentIDE";
 import { AgentFile, AgentStep } from "@/lib/lotSuperAgent";
 import { FileDiffRecord, parseLiveAgentStream } from "@/lib/agentPatcher";
-import { LotUser, getLocalUser, setLocalUser, supabase } from "@/lib/authClient";
+import { LotUser, getLocalUser, setLocalUser, supabase, extractFirstName } from "@/lib/authClient";
 import { saveChatSession, deleteChatSession } from "@/lib/chatStorage";
 import { pushSessionToCloud, deleteSessionFromCloud, syncAllSessionsWithCloud } from "@/lib/cloudSync";
 import {
@@ -115,13 +115,14 @@ export default function Home() {
       supabase.auth.getUser().then(({ data }) => {
         if (!isMounted) return;
         if (data?.user) {
+          const cleanName =
+            data.user.user_metadata?.full_name ||
+            extractFirstName(null, data.user.email) ||
+            "Prasad";
           const supaUser: LotUser = {
             id: data.user.id,
             email: data.user.email || "",
-            name:
-              data.user.user_metadata?.full_name ||
-              data.user.email?.split("@")[0] ||
-              "User",
+            name: cleanName,
             plan: "free",
           };
           setUser(supaUser);

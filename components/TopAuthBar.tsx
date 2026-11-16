@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { LotUser, supabase, setLocalUser } from "@/lib/authClient";
+import { LotUser, supabase, setLocalUser, extractFirstName } from "@/lib/authClient";
 import { MoreVertical, LogOut, LogIn, User, ShieldCheck } from "lucide-react";
 
 interface TopAuthBarProps {
@@ -71,24 +71,29 @@ export function TopAuthBar({ user, onOpenAuth, onLogout }: TopAuthBarProps) {
           {user ? (
             <div>
               {/* Profile Card */}
-              <div className="flex items-center gap-3 p-2 rounded-xl bg-neutral-900/60 border border-neutral-800/80">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-neutral-800 to-neutral-700 text-sm font-bold uppercase text-white shadow-inner">
-                  {user.name ? user.name.charAt(0) : user.email ? user.email.charAt(0) : "U"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-white truncate">
-                      {user.name || "Prasad"}
-                    </span>
-                    <span className="rounded-md bg-neutral-800 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-neutral-300 border border-neutral-700/60">
-                      {user.plan || "FREE"}
-                    </span>
+              {(() => {
+                const displayName = extractFirstName(user.name, user.email) || user.name || "Prasad";
+                return (
+                  <div className="flex items-center gap-3 p-2 rounded-xl bg-neutral-900/60 border border-neutral-800/80">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-neutral-800 to-neutral-700 text-sm font-bold uppercase text-white shadow-inner">
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-white truncate">
+                          {displayName}
+                        </span>
+                        <span className="rounded-md bg-neutral-800 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-neutral-300 border border-neutral-700/60">
+                          {user.plan || "FREE"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 truncate mt-0.5">
+                        {user.email || "padalaprasad94@gmail.com"}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-neutral-400 truncate mt-0.5">
-                    {user.email || "padalaprasad94@gmail.com"}
-                  </p>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Status Details */}
               <div className="mt-2.5 px-2.5 py-2 rounded-xl bg-neutral-900/40 border border-neutral-800/50 space-y-1.5 text-[11px]">
