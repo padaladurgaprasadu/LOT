@@ -80,8 +80,12 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
               {isStreaming ? "Reasoning in progress" : `Thought for ${formattedDuration}`}
             </span>
             {isStreaming && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800">
+                <img
+                  src="/loading-dots-blue.svg"
+                  alt="Thinking"
+                  className="h-2.5 w-auto object-contain select-none"
+                />
                 {formattedDuration}
               </span>
             )}
@@ -114,9 +118,13 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
       {isOpen && (
         <div className="border-t border-zinc-800/60 bg-black/40 p-3.5 font-mono text-xs leading-relaxed text-zinc-400/90 max-h-80 overflow-y-auto whitespace-pre-wrap selection:bg-purple-500/30 selection:text-white">
           {trimmed || (
-            <div className="flex items-center gap-2 text-zinc-500 italic">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-400/70 animate-pulse" />
-              Ingesting cognitive tokens...
+            <div className="flex items-center gap-2 text-zinc-400 italic text-xs">
+              <img
+                src="/loading-dots-blue.svg"
+                alt="Thinking..."
+                className="h-4 w-auto object-contain select-none"
+              />
+              <span>Ingesting cognitive tokens...</span>
             </div>
           )}
         </div>

@@ -303,11 +303,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       {/* 2. Thinking State */}
       {isThinking ? (
         <div className="flex items-center space-x-2.5 py-2 text-zinc-400 text-xs animate-in fade-in duration-150">
-          <div className="flex space-x-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-            <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-            <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-          </div>
+          <img
+            src="/loading-dots-blue.svg"
+            alt="Thinking..."
+            className="h-5 w-auto object-contain select-none"
+          />
           <span className="text-zinc-400 font-sans text-xs">Thinking...</span>
         </div>
       ) : (
