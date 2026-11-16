@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import dynamic from "next/dynamic";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { DiffViewer } from "../components/DiffViewer";
 import { CognitiveStream } from "../components/CognitiveStream";
 import { WorkspaceErrorBoundary } from "../components/canvases/WorkspaceErrorBoundary";
 import { ScheduleTasksModal } from "../components/ScheduleTasksModal";
@@ -46,74 +44,6 @@ import {
 import { LotOsMode, LOT_OS_MODES } from "@/lib/lot-os/types";
 import { DEFAULT_MODEL_ID, LOT_SYSTEM_PROMPT } from "../lib/nvidia";
 import { migrateGuestConversationsToUser, saveInputDraft, getInputDraft, clearInputDraft } from "../lib/session";
-import {
-  PanelRightClose,
-  PanelRightOpen,
-  Sparkles,
-  GripVertical,
-  Cpu,
-  Code2,
-  Bot,
-  Headphones,
-  GraduationCap,
-  MessageSquare,
-} from "lucide-react";
-
-// Loading Skeleton for SSR-safe Dynamic Canvases
-function CanvasLoadingSkeleton({ title }: { title: string }) {
-  return (
-    <div className="h-full w-full flex flex-col items-center justify-center p-8 bg-[#09090c] text-white space-y-3">
-      <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center animate-pulse">
-        <Sparkles className="w-5 h-5 text-blue-400 animate-spin" style={{ animationDuration: "3s" }} />
-      </div>
-      <div className="text-xs font-mono text-zinc-400">{title}</div>
-      <div className="w-36 h-1 rounded-full bg-zinc-800 overflow-hidden">
-        <div className="w-1/2 h-full bg-blue-500 animate-pulse" />
-      </div>
-    </div>
-  );
-}
-
-// SSR-Safe Dynamic Imports for All 5 Workspace Canvases
-const AppPreviewCanvas = dynamic(
-  () => import("../components/canvases/AppPreviewCanvas"),
-  {
-    ssr: false,
-    loading: () => <CanvasLoadingSkeleton title="Loading App Sandbox & Android Mockup..." />,
-  }
-);
-
-const PcbHardwareCanvas = dynamic(
-  () => import("../components/canvases/PcbHardwareCanvas"),
-  {
-    ssr: false,
-    loading: () => <CanvasLoadingSkeleton title="Loading TSCircuit 2D/3D Hardware Engine..." />,
-  }
-);
-
-const AutonomousActionCard = dynamic(
-  () => import("../components/canvases/AutonomousActionCard"),
-  {
-    ssr: false,
-    loading: () => <CanvasLoadingSkeleton title="Loading ReAct Timeline & HITL Gate..." />,
-  }
-);
-
-const MeetingAssistant = dynamic(
-  () => import("../components/canvases/MeetingAssistant"),
-  {
-    ssr: false,
-    loading: () => <CanvasLoadingSkeleton title="Loading Meeting Co-pilot Audio HUD..." />,
-  }
-);
-
-const AcademicCanvas = dynamic(
-  () => import("../components/canvases/AcademicCanvas"),
-  {
-    ssr: false,
-    loading: () => <CanvasLoadingSkeleton title="Loading KaTeX & ArXiv Research Canvas..." />,
-  }
-);
 
 let messageCounter = 0;
 function nextMessageId(): string {
@@ -146,16 +76,8 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [inputDraft, setInputDraft] = useState("");
 
-  // LOT-OS Dynamic Workspace State
+  // LOT-OS Conversation Mode State
   const [activeMode, setActiveMode] = useState<LotOsMode>("chat");
-  const [currentCanvasPayload, setCurrentCanvasPayload] = useState<any>(null);
-  const [rightCanvasTab, setRightCanvasTab] = useState<"workspace" | "diff" | "python">("workspace");
-  const [swarmData, setSwarmData] = useState<any>(null);
-  const [pythonOutput, setPythonOutput] = useState<string>("# In-Browser Pyodide WASM Runtime Ready\n");
-  const [splitWidth, setSplitWidth] = useState<number>(48); // Left cognitive pane % (25 to 75)
-  const [isCanvasVisible, setIsCanvasVisible] = useState<boolean>(true);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "canvas">("chat");
 
   // Streaming generation state
   const [isLoading, setIsLoading] = useState(false);
@@ -268,74 +190,9 @@ export default function Home() {
     };
   }, [user?.id]);
 
-  // Split-Screen Drag Separator Listeners
-  const handleSeparatorMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handlePointerMove = useCallback(
-    (e: PointerEvent) => {
-      if (!isDragging || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
-      // Clamp between 25% and 75%
-      const clamped = Math.min(Math.max(newWidth, 25), 75);
-      setSplitWidth(clamped);
-    },
-    [isDragging]
-  );
-
-  const handlePointerUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-    }
-  }, [isDragging]);
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("pointermove", handlePointerMove);
-      window.addEventListener("pointerup", handlePointerUp);
-    } else {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    }
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, [isDragging, handlePointerMove, handlePointerUp]);
-
-  // Handle double-click to reset split width to 50%
-  const handleResetSplit = () => {
-    setSplitWidth(48);
-  };
-
-  // Switch mode handler: updates mode and right dynamic canvas
+  // Switch mode handler: updates conversational mode
   const handleSelectMode = (newMode: LotOsMode) => {
     setActiveMode(newMode);
-    if (mobileTab === "chat") {
-      // Keep on current tab, but right canvas is now prepped
-    }
-  };
-
-  // Open action card in canvas
-  const handleOpenActionInCanvas = (actionPayload: any) => {
-    if (actionPayload?.type === "food") {
-      setActiveMode("agent");
-      setCurrentCanvasPayload(actionPayload);
-    } else if (actionPayload?.type === "pcb") {
-      setActiveMode("pcb");
-      setCurrentCanvasPayload(actionPayload);
-    } else if (actionPayload?.type === "app") {
-      setActiveMode("app");
-      setCurrentCanvasPayload(actionPayload);
-    } else {
-      setActiveMode("agent");
-      setCurrentCanvasPayload(actionPayload);
-    }
-    setIsCanvasVisible(true);
-    setMobileTab("canvas");
   };
 
   // Active conversation helper
@@ -354,7 +211,6 @@ export default function Home() {
     setSidebarOpen(false);
     clearInputDraft(activeConvId);
     setInputDraft("");
-    setCurrentCanvasPayload(null);
   };
 
   const handleDeleteConversation = (id: string) => {
@@ -514,15 +370,10 @@ export default function Home() {
       localStorage.setItem("lot_guest_count", String(guestCount + 1));
     }
 
-    // Detect prompt intent to sync workspace mode automatically
+    // Detect prompt intent to sync conversational mode automatically
     const lowerContent = content.toLowerCase();
     if (/biryani|swiggy|zomato|order food/i.test(lowerContent)) {
       setActiveMode("agent");
-      setCurrentCanvasPayload({
-        type: "food",
-        title: "Swiggy Autonomous Biryani Dispatch",
-        content,
-      });
     } else if (/pcb|schematic|circuit|tscircuit|gerber/i.test(lowerContent)) {
       setActiveMode("pcb");
     } else if (/app dev|react|sandpack|frontend|mobile app|android/i.test(lowerContent)) {
@@ -694,32 +545,23 @@ export default function Home() {
           );
         }
         if (json.actionCard) {
-          setCurrentCanvasPayload(json.actionCard);
           setActiveMode("agent");
-          setIsCanvasVisible(true);
         }
         if (json.artifacts) {
           if (json.artifacts.reactApp) {
-            const code = json.artifacts.reactApp.sanitizedCode || json.artifacts.reactApp.code;
-            setCurrentCanvasPayload({ code, files: { "/App.js": code } });
             setActiveMode("app");
-            setIsCanvasVisible(true);
           } else if (json.artifacts.pcbSpec) {
-            setCurrentCanvasPayload(json.artifacts.pcbSpec);
             setActiveMode("pcb");
-            setIsCanvasVisible(true);
           } else if (json.artifacts.autonomousAction) {
-            setCurrentCanvasPayload(json.artifacts.autonomousAction);
             setActiveMode("agent");
-            setIsCanvasVisible(true);
           }
         }
         if (json.intent) {
-          if (json.intent === "APP_PREVIEW") { setActiveMode("app"); setIsCanvasVisible(true); }
-          else if (json.intent === "PCB_HARDWARE") { setActiveMode("pcb"); setIsCanvasVisible(true); }
-          else if (json.intent === "AUTONOMOUS_ACTION") { setActiveMode("agent"); setIsCanvasVisible(true); }
-          else if (json.intent === "MEETING_ASSISTANT") { setActiveMode("meeting"); setIsCanvasVisible(true); }
-          else if (json.intent === "ACADEMIC_RESEARCH") { setActiveMode("academic"); setIsCanvasVisible(true); }
+          if (json.intent === "APP_PREVIEW") { setActiveMode("app"); }
+          else if (json.intent === "PCB_HARDWARE") { setActiveMode("pcb"); }
+          else if (json.intent === "AUTONOMOUS_ACTION") { setActiveMode("agent"); }
+          else if (json.intent === "MEETING_ASSISTANT") { setActiveMode("meeting"); }
+          else if (json.intent === "ACADEMIC_RESEARCH") { setActiveMode("academic"); }
         }
 
         setConversations((prev) => {
@@ -745,21 +587,11 @@ export default function Home() {
 
         if (jsonContent) {
           if (/function\s+App\s*\(|export\s+default\s+function\s+App/i.test(jsonContent)) {
-            const codeMatch = jsonContent.match(/```(?:jsx|tsx|javascript|typescript|react)?\s*([\s\S]*?)```/i);
-            const rawCode = codeMatch ? codeMatch[1].trim() : jsonContent;
-            setCurrentCanvasPayload({ code: rawCode, files: { "/App.js": rawCode } });
             setActiveMode("app");
-            setIsCanvasVisible(true);
           } else if (/<board|<resistor|<capacitor|@tscircuit/i.test(jsonContent)) {
-            const pcbMatch = jsonContent.match(/```(?:tsx|jsx|typescript)?\s*([\s\S]*?)```/i);
-            const pcbCode = pcbMatch ? pcbMatch[1].trim() : jsonContent;
-            setCurrentCanvasPayload({ circuitCode: pcbCode });
             setActiveMode("pcb");
-            setIsCanvasVisible(true);
           } else if (/biryani|swiggy|zomato/i.test(jsonContent) && /order|status|dispatch/i.test(jsonContent)) {
-            setCurrentCanvasPayload({ type: "food", service: "food_ordering" });
             setActiveMode("agent");
-            setIsCanvasVisible(true);
           }
         }
         return;
@@ -857,26 +689,17 @@ export default function Home() {
 
             // Direct ActionCard payload from server
             if (data.actionCard) {
-              setCurrentCanvasPayload(data.actionCard);
               setActiveMode("agent");
-              setIsCanvasVisible(true);
             }
 
             // Artifacts extraction payload from server
             if (data.artifacts) {
               if (data.artifacts.reactApp) {
-                const code = data.artifacts.reactApp.sanitizedCode || data.artifacts.reactApp.code;
-                setCurrentCanvasPayload({ code, files: { "/App.js": code } });
                 setActiveMode("app");
-                setIsCanvasVisible(true);
               } else if (data.artifacts.pcbSpec) {
-                setCurrentCanvasPayload(data.artifacts.pcbSpec);
                 setActiveMode("pcb");
-                setIsCanvasVisible(true);
               } else if (data.artifacts.autonomousAction) {
-                setCurrentCanvasPayload(data.artifacts.autonomousAction);
                 setActiveMode("agent");
-                setIsCanvasVisible(true);
               }
             }
 
@@ -884,19 +707,14 @@ export default function Home() {
             if (data.intent) {
               if (data.intent === "APP_PREVIEW") {
                 setActiveMode("app");
-                setIsCanvasVisible(true);
               } else if (data.intent === "PCB_HARDWARE") {
                 setActiveMode("pcb");
-                setIsCanvasVisible(true);
               } else if (data.intent === "AUTONOMOUS_ACTION") {
                 setActiveMode("agent");
-                setIsCanvasVisible(true);
               } else if (data.intent === "MEETING_ASSISTANT") {
                 setActiveMode("meeting");
-                setIsCanvasVisible(true);
               } else if (data.intent === "ACADEMIC_RESEARCH") {
                 setActiveMode("academic");
-                setIsCanvasVisible(true);
               }
             }
 
@@ -981,25 +799,15 @@ export default function Home() {
         return next;
       });
 
-      // Auto-extract and activate matching canvas if not set by explicit event
+      // Maintain active mode classification without side canvas
       const finalClean = streamedRaw.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
       if (finalClean) {
         if (/function\s+App\s*\(|export\s+default\s+function\s+App/i.test(finalClean)) {
-          const codeMatch = finalClean.match(/```(?:jsx|tsx|javascript|typescript|react)?\s*([\s\S]*?)```/i);
-          const rawCode = codeMatch ? codeMatch[1].trim() : finalClean;
-          setCurrentCanvasPayload({ code: rawCode, files: { "/App.js": rawCode } });
           setActiveMode("app");
-          setIsCanvasVisible(true);
         } else if (/<board|<resistor|<capacitor|@tscircuit/i.test(finalClean)) {
-          const pcbMatch = finalClean.match(/```(?:tsx|jsx|typescript)?\s*([\s\S]*?)```/i);
-          const pcbCode = pcbMatch ? pcbMatch[1].trim() : finalClean;
-          setCurrentCanvasPayload({ circuitCode: pcbCode });
           setActiveMode("pcb");
-          setIsCanvasVisible(true);
         } else if (/biryani|swiggy|zomato/i.test(finalClean) && /order|status|dispatch/i.test(finalClean)) {
-          setCurrentCanvasPayload({ type: "food", service: "food_ordering" });
           setActiveMode("agent");
-          setIsCanvasVisible(true);
         }
       }
     } catch (err: any) {
@@ -1026,73 +834,6 @@ export default function Home() {
     }
   };
 
-  // Render the active right workspace canvas based on mode & payload
-  const renderActiveCanvas = () => {
-    switch (activeMode) {
-      case "pcb":
-        return (
-          <PcbHardwareCanvas
-            activeMode={activeMode}
-            currentPayload={currentCanvasPayload}
-            onAction={(act, data) => console.log("PCB Action:", act, data)}
-          />
-        );
-      case "app":
-        return (
-          <AppPreviewCanvas
-            activeMode={activeMode}
-            currentPayload={currentCanvasPayload}
-            onAction={(act, data) => console.log("App Action:", act, data)}
-          />
-        );
-      case "agent":
-        return (
-          <AutonomousActionCard
-            activeMode={activeMode}
-            currentPayload={currentCanvasPayload}
-            onAction={(act, data) => console.log("Agent Action:", act, data)}
-          />
-        );
-      case "meeting":
-        return (
-          <MeetingAssistant
-            activeMode={activeMode}
-            currentPayload={currentCanvasPayload}
-            onAction={(act, data) => console.log("Meeting Action:", act, data)}
-          />
-        );
-      case "academic":
-        return (
-          <AcademicCanvas
-            activeMode={activeMode}
-            currentPayload={currentCanvasPayload}
-            onAction={(act, data) => console.log("Academic Action:", act, data)}
-          />
-        );
-      case "chat":
-      default:
-        // In Chat mode, if an action card is active, render AutonomousActionCard, otherwise AppPreviewCanvas
-        if (currentCanvasPayload?.type === "food" || currentCanvasPayload?.actions) {
-          return (
-            <AutonomousActionCard
-              activeMode="agent"
-              currentPayload={currentCanvasPayload}
-              onAction={(act, data) => console.log("Agent Action:", act, data)}
-            />
-          );
-        }
-        return (
-          <AppPreviewCanvas
-            activeMode={activeMode}
-            currentPayload={currentCanvasPayload}
-            onAction={(act, data) => console.log("App Action:", act, data)}
-          />
-        );
-    }
-  };
-
-  const activeModeMeta = LOT_OS_MODES.find((m) => m.id === activeMode) || LOT_OS_MODES[0];
-
   return (
     <div
       ref={containerRef}
@@ -1118,14 +859,10 @@ export default function Home() {
         onOpenAuth={() => setAuthOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         userProfile={userProfile}
-        isCanvasVisible={isCanvasVisible}
-        onToggleCanvas={() => setIsCanvasVisible(!isCanvasVisible)}
-        rightCanvasTab={rightCanvasTab}
-        onSelectRightCanvasTab={setRightCanvasTab}
         selectedModel={selectedModel}
       />
 
-      {/* Main Split-Screen Workspace Container */}
+      {/* Main Full-Width Cognitive Workspace Container */}
       <div className="flex flex-col flex-1 h-full min-w-0 bg-black relative overflow-hidden">
         {/* OS Top Navigation Bar */}
         <Header
@@ -1143,189 +880,37 @@ export default function Home() {
           }}
         />
 
-        {/* Mobile View Switcher Tabs (< 1024px) */}
-        <div className="lg:hidden flex items-center justify-around bg-[#0c0c10] border-b border-zinc-800 p-1.5 shrink-0 z-20">
-          <button
-            type="button"
-            onClick={() => setMobileTab("chat")}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
-              mobileTab === "chat" ? "bg-zinc-800 text-blue-400" : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>Chat Stream</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobileTab("canvas")}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
-              mobileTab === "canvas" ? "bg-zinc-800 text-blue-400" : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Workspace Canvas</span>
-          </button>
-        </div>
-
-        {/* Two-Pane Body Container */}
-        <div className="flex-1 flex flex-row min-h-0 w-full overflow-hidden relative">
-          {/* LEFT PANE: Cognitive Stream */}
-          <div
-            className={`h-full min-h-0 flex flex-col overflow-hidden transition-all duration-100 ${
-              mobileTab === "chat" ? "flex" : "hidden lg:flex"
-            }`}
-            style={{
-              width: isCanvasVisible ? `${splitWidth}%` : "100%",
+        {/* Pure Full-Width Cognitive Stream */}
+        <main className="flex-1 flex flex-col min-h-0 w-full overflow-hidden relative">
+          <WorkspaceErrorBoundary
+            fallbackTitle="Cognitive Stream Recovered"
+            onReset={() => {
+              setActiveConvId(null);
+              setStoredCurrentConvId(null);
             }}
           >
-            <WorkspaceErrorBoundary
-              fallbackTitle="Cognitive Stream Recovered"
-              onReset={() => {
-                setActiveConvId(null);
-                setStoredCurrentConvId(null);
-              }}
-            >
-              <CognitiveStream
-                mode={activeMode}
-                onSelectMode={handleSelectMode}
-                messages={
-                  activeConversation && Array.isArray(activeConversation.messages)
-                    ? activeConversation.messages.filter(Boolean)
-                    : []
-                }
-                isLoading={isLoading}
-                userProfile={userProfile}
-                onSendMessage={handleSendMessage}
-                onStopGeneration={handleStopGeneration}
-                onEditMessage={handleEditMessage}
-                onShareMessage={() => setShareOpen(true)}
-                onOpenActionInCanvas={handleOpenActionInCanvas}
-                searchFocus={searchFocus}
-                onSearchFocusChange={setSearchFocus}
-                onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
-                onOpenLotCode={() => setLotCodeOpen(true)}
-                inputDraft={inputDraft}
-                isCanvasVisible={isCanvasVisible}
-                onToggleCanvas={() => setIsCanvasVisible(!isCanvasVisible)}
-              />
-            </WorkspaceErrorBoundary>
-          </div>
-
-          {/* DRAGGABLE RESIZER DIVIDER (Visible on Desktop when Canvas is Open) */}
-          {isCanvasVisible && (
-            <div
-              onMouseDown={handleSeparatorMouseDown}
-              onDoubleClick={handleResetSplit}
-              title="Drag to resize workspace panes (Double-click to reset 50%)"
-              className={`hidden lg:flex w-1.5 hover:w-2 bg-[#18181f] hover:bg-blue-500/80 active:bg-blue-500 cursor-col-resize select-none items-center justify-center transition-all group z-30 ${
-                isDragging ? "bg-blue-500 w-2" : ""
-              }`}
-            >
-              <div className="h-8 w-1 rounded-full bg-zinc-600 group-hover:bg-white transition-colors" />
-            </div>
-          )}
-
-          {/* RIGHT PANE: Morphing Workspace Canvas */}
-          <div
-            className={`h-full min-h-0 flex-col overflow-hidden bg-[#09090c] border-l border-zinc-900 ${
-              isCanvasVisible ? (mobileTab === "canvas" ? "flex" : "hidden lg:flex") : "hidden"
-            }`}
-            style={{
-              width: isCanvasVisible ? `${100 - splitWidth}%` : "0%",
-            }}
-          >
-            {/* Right Pane OS Window Bar */}
-            <div className="shrink-0 h-10 border-b border-zinc-800/90 bg-[#0c0c12] px-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-zinc-200">
-                  {activeModeMeta.label} Canvas
-                </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-                  LOT Runtime
-                </span>
-              </div>
-
-              {/* Viewport Switcher: Workspace, 3-Way Diff Studio, Python WASM */}
-              <div className="flex items-center gap-1 bg-zinc-900/90 p-0.5 rounded-lg border border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setRightCanvasTab("workspace")}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                    rightCanvasTab === "workspace"
-                      ? "bg-zinc-800 text-white shadow-sm"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  Workspace
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightCanvasTab("diff")}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                    rightCanvasTab === "diff"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  3-Way Diff
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightCanvasTab("python")}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                    rightCanvasTab === "python"
-                      ? "bg-amber-600 text-white shadow-sm"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  Python WASM
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setIsCanvasVisible(false)}
-                  title="Collapse Workspace Canvas"
-                  className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                >
-                  <PanelRightClose className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Canvas Execution Runtime with Isolated Error Boundary */}
-            <div className="flex-1 w-full min-h-0 relative overflow-hidden">
-              <WorkspaceErrorBoundary fallbackTitle={`${activeModeMeta.label} Runtime Interruption`}>
-                {rightCanvasTab === "diff" ? (
-                  <DiffViewer
-                    filePath={swarmData?.gitState?.filePath || "src/App.tsx"}
-                    candidateA={swarmData?.swarmResult?.candidateDiffA || "// Candidate Diff A (NVIDIA NIM)"}
-                    candidateB={swarmData?.swarmResult?.candidateDiffB || "// Candidate Diff B (Groq)"}
-                    critique={swarmData?.swarmResult?.reasoningCritique || "DeepSeek-R1 verified zero AST conflicts."}
-                    synthesized={swarmData?.swarmResult?.synthesizedUnifiedDiff || "// Awaiting Swarm consensus synthesis..."}
-                    onApplyToSandbox={(updated) => {
-                      setCurrentCanvasPayload({ code: updated, files: { "src/App.tsx": updated } });
-                      setRightCanvasTab("workspace");
-                    }}
-                  />
-                ) : rightCanvasTab === "python" ? (
-                  <div className="h-full flex flex-col bg-zinc-950 p-4 font-mono text-xs">
-                    <div className="text-amber-400 mb-2 font-semibold flex items-center justify-between">
-                      <span>Tier-0: In-Browser Python WASM Sandbox (workers/pyodide.worker.ts)</span>
-                      <span className="text-[10px] text-zinc-500">Zero Server Cost</span>
-                    </div>
-                    <pre className="flex-1 bg-black p-4 rounded-xl border border-zinc-800 text-emerald-300 overflow-auto custom-scrollbar">
-                      {pythonOutput}
-                    </pre>
-                  </div>
-                ) : (
-                  renderActiveCanvas()
-                )}
-              </WorkspaceErrorBoundary>
-            </div>
-          </div>
-        </div>
+            <CognitiveStream
+              mode={activeMode}
+              onSelectMode={handleSelectMode}
+              messages={
+                activeConversation && Array.isArray(activeConversation.messages)
+                  ? activeConversation.messages.filter(Boolean)
+                  : []
+              }
+              isLoading={isLoading}
+              userProfile={userProfile}
+              onSendMessage={handleSendMessage}
+              onStopGeneration={handleStopGeneration}
+              onEditMessage={handleEditMessage}
+              onShareMessage={() => setShareOpen(true)}
+              searchFocus={searchFocus}
+              onSearchFocusChange={setSearchFocus}
+              onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
+              onOpenLotCode={() => setLotCodeOpen(true)}
+              inputDraft={inputDraft}
+            />
+          </WorkspaceErrorBoundary>
+        </main>
       </div>
 
       {/* Modals & Dialogs */}

@@ -30,7 +30,7 @@ export class WorkspaceErrorBoundary extends Component<
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("[WorkspaceErrorBoundary] Intercepted canvas exception:", error, errorInfo);
+    console.error("[WorkspaceErrorBoundary] Intercepted stream exception:", error, errorInfo);
     this.setState({ errorInfo });
   }
 
@@ -52,7 +52,7 @@ export class WorkspaceErrorBoundary extends Component<
 
             <div>
               <h3 className="text-base font-semibold text-white">
-                {this.props.fallbackTitle || "Workspace Canvas Runtime Crash"}
+                {this.props.fallbackTitle || "Cognitive Stream Exception"}
               </h3>
               <p className="text-xs text-zinc-400 mt-1">
                 An isolated exception was intercepted in this workspace runtime. The core OS shell
@@ -82,7 +82,7 @@ export class WorkspaceErrorBoundary extends Component<
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-lg active:scale-95"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Recover Canvas</span>
+                <span>Recover Stream</span>
               </button>
             </div>
           </div>

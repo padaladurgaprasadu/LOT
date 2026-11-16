@@ -228,24 +228,10 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                       </div>
                     </div>
 
-                    {onOpenActionInCanvas && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onOpenActionInCanvas(
-                            actionPreview.rawPayload || {
-                              type: actionPreview.type,
-                              title: actionPreview.title,
-                              content: message.content,
-                            }
-                          )
-                        }
-                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md shrink-0 self-end sm:self-auto"
-                      >
-                        <span>Open in Canvas</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      {/* Clean action status badge without side canvas trigger */}
+                      <span className="text-[11px] text-zinc-500 font-mono shrink-0">
+                        Ready
+                      </span>
                   </div>
                 </div>
               )}
