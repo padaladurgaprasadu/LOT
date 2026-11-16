@@ -613,29 +613,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               <ThumbsDown className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          {/* Clickable Follow-Up Questions at Conclusion (Only active on latest response before next question) */}
-          {(showFollowUps ?? !isStreaming) && !isStreaming && followUps.length > 0 && (
-            <div className="mt-5 pt-3.5 border-t border-neutral-800/80 w-full animate-in fade-in duration-200">
-              <p className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-2">
-                Continue exploring
-              </p>
-              <div className="flex flex-col gap-2 w-full">
-                {followUps.map((question, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onSelectFollowUp?.(question)}
-                    className="group flex items-center justify-between w-full text-left px-3.5 py-2.5 rounded-xl bg-neutral-900/70 hover:bg-neutral-800/90 border border-neutral-800 hover:border-neutral-700 text-sm text-neutral-200 transition-all duration-150 active:scale-[0.99]"
-                  >
-                    <span>{question}</span>
-                    <span className="text-neutral-500 group-hover:text-neutral-200 group-hover:translate-x-0.5 transition-transform ml-3">
-                      →
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
