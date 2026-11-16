@@ -262,7 +262,7 @@ Follow these strict rules in every response:
 
     // Fast-path: True Instant SSE Stream with Zero 45-second Buffering
     if (isStreaming) {
-      const preferredModel = body.model || body.modelOverride || "nvidia/nemotron-3-ultra-550b-a55b";
+      const preferredModel = body.model || body.modelOverride || "meta/llama-3.3-70b-instruct";
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream({
@@ -300,24 +300,29 @@ Follow these strict rules in every response:
                 await new Promise((r) => setTimeout(r, 20));
               }
             } else {
-              // Direct NVIDIA NIM Real-Time Streaming
+              // Direct NVIDIA NIM Real-Time Streaming with Ultra-Fast 4.5s Failover to 8B model
               const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
               const candidates = [
                 preferredModel,
-                "meta/muse-glimmer-30b",
+                "meta/llama-3.3-70b-instruct",
+                "meta/llama-3.1-8b-instruct",
                 "nvidia/nemotron-3-ultra-550b-a55b",
-                "poolside/laguna-xs-2.1",
-                "minimaxai/minimax-m3.1-flash",
-              ].filter(Boolean);
+              ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
 
               let streamStarted = false;
 
               if (apiKey && apiKey.trim().length > 0) {
                 for (const candidate of candidates) {
                   if (streamStarted) break;
+                  let timeoutId: NodeJS.Timeout | null = null;
                   try {
                     const nimController = new AbortController();
-                    const timeoutId = setTimeout(() => nimController.abort(), 12000);
+                    timeoutId = setTimeout(() => {
+                      if (!streamStarted) {
+                        console.warn(`[LOT CHAT] Candidate ${candidate} queued > 4.5s. Auto-switching to fast fallback...`);
+                        nimController.abort();
+                      }
+                    }, 4500); // 4.5s max wait for first token
 
                     const nimRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
                       method: "POST",
@@ -333,7 +338,7 @@ Follow these strict rules in every response:
                         stream: true,
                       }),
                       signal: nimController.signal,
-                    }).finally(() => clearTimeout(timeoutId));
+                    });
 
                     if (nimRes.ok && nimRes.body) {
                       const reader = nimRes.body.getReader();
@@ -360,6 +365,9 @@ Follow these strict rules in every response:
                             const textChunk = parsed.choices?.[0]?.delta?.content || "";
 
                             if (textChunk) {
+                              if (!streamStarted && timeoutId) {
+                                clearTimeout(timeoutId);
+                              }
                               streamStarted = true;
                               accumulatedContent += textChunk;
                               controller.enqueue(
@@ -373,10 +381,15 @@ Follow these strict rules in every response:
                           } catch {}
                         }
                       }
+                      if (timeoutId) clearTimeout(timeoutId);
                       if (streamStarted) break;
+                    } else {
+                      if (timeoutId) clearTimeout(timeoutId);
                     }
                   } catch (candidateErr) {
-                    console.warn(`[LOT CHAT] Upstream candidate ${candidate} failed:`, candidateErr);
+                    if (timeoutId) clearTimeout(timeoutId);
+                    if (streamStarted) break;
+                    console.warn(`[LOT CHAT] Upstream candidate ${candidate} failed/timed out, rotating immediately:`, candidateErr);
                   }
                 }
               }
