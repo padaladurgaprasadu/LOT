@@ -250,7 +250,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const isPrismSiliconOr3D =
     !isUser &&
     messageContent &&
-    (/\b(PRISM|Silicon|GPU|TPU|Die Stack|3D|Three\.js|HBM|WebGL)\b/i.test(messageContent) &&
+    (/\b(PRISM\s+Silicon|Die\s+Stack|\[3D_VIEWPORT\])\b/i.test(messageContent) &&
       !messageContent.includes("```"));
 
   const { heroEntity, cleanMarkdown, followUps } = isUser

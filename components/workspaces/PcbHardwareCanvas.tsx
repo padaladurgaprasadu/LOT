@@ -102,10 +102,16 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload>> = ({
     camera.position.set(0, 3.5, 5);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    container.appendChild(renderer.domElement);
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, failIfMajorPerformanceCaveat: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      container.appendChild(renderer.domElement);
+    } catch (glErr) {
+      console.warn("[PCB 3D] WebGL context creation failed:", glErr);
+      return;
+    }
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
@@ -196,12 +202,12 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload>> = ({
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       boardGroup.rotation.y += 0.008;
-      renderer.render(scene, camera);
+      renderer?.render(scene, camera);
     };
     animate();
 
     const handleResize = () => {
-      if (!container) return;
+      if (!container || !renderer) return;
       const w = container.clientWidth || 500;
       const h = container.clientHeight || 400;
       camera.aspect = w / h;
@@ -213,7 +219,7 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload>> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", handleResize);
-      renderer.dispose();
+      renderer?.dispose();
       if (container) container.innerHTML = "";
     };
   }, [activeTab]);
@@ -234,10 +240,16 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload>> = ({
     camera.position.set(0, 2.8, 4.8);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    container.appendChild(renderer.domElement);
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, failIfMajorPerformanceCaveat: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      container.appendChild(renderer.domElement);
+    } catch (glErr) {
+      console.warn("[PCB 3D] WebGL context creation failed:", glErr);
+      return;
+    }
 
     // Ambient & Accent Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -303,12 +315,12 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload>> = ({
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       chipGroup.rotation.y += 0.01;
-      renderer.render(scene, camera);
+      renderer?.render(scene, camera);
     };
     animate();
 
     const handleResize = () => {
-      if (!container) return;
+      if (!container || !renderer) return;
       const w = container.clientWidth || 500;
       const h = container.clientHeight || 400;
       camera.aspect = w / h;
@@ -320,7 +332,7 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload>> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", handleResize);
-      renderer.dispose();
+      renderer?.dispose();
       if (container) container.innerHTML = "";
     };
   }, [activeTab]);

@@ -35,14 +35,22 @@ export function AuthModal({
 
   const isNetworkFailure = (err: any) => {
     const msg = (err?.message || "").toLowerCase();
+    const str = String(err || "").toLowerCase();
+    const name = (err?.name || "").toLowerCase();
     return (
-      err?.name === "TypeError" ||
+      name === "typeerror" ||
+      name.includes("fetch") ||
+      name.includes("network") ||
       msg.includes("failed to fetch") ||
-      msg.includes("networkerror") ||
+      str.includes("failed to fetch") ||
       msg.includes("fetch failed") ||
+      msg.includes("networkerror") ||
+      msg.includes("network error") ||
       msg.includes("load failed") ||
       msg.includes("abort") ||
-      msg.includes("connection refused")
+      msg.includes("connection refused") ||
+      msg.includes("enotfound") ||
+      msg.includes("econnrefused")
     );
   };
 

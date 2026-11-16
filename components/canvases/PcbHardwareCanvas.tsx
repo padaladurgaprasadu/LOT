@@ -303,11 +303,17 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload | any>>
     camera.position.set(0, 45, 60);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    container.appendChild(renderer.domElement);
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, failIfMajorPerformanceCaveat: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1, 2));
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+    } catch (glErr) {
+      console.warn("[PCB 3D] WebGL context creation failed, skipping 3D viewport:", glErr);
+      return;
+    }
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -437,26 +443,35 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload | any>>
       isDragging3D = false;
     };
 
-    const domEl = renderer.domElement;
-    domEl.addEventListener("mousedown", onMouseDown3D);
-    window.addEventListener("mousemove", onMouseMove3D);
-    window.addEventListener("mouseup", onMouseUp3D);
+    const domEl = renderer?.domElement;
+    if (domEl) {
+      domEl.addEventListener("mousedown", onMouseDown3D);
+      window.addEventListener("mousemove", onMouseMove3D);
+      window.addEventListener("mouseup", onMouseUp3D);
+    }
 
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       if (!isDragging3D) {
         pcbGroup.rotation.y += 0.004;
       }
-      renderer.render(scene, camera);
+      renderer?.render(scene, camera);
     };
     animate();
 
     return () => {
       cancelAnimationFrame(frameId);
-      domEl.removeEventListener("mousedown", onMouseDown3D);
-      window.removeEventListener("mousemove", onMouseMove3D);
-      window.removeEventListener("mouseup", onMouseUp3D);
-      renderer.dispose();
+      if (domEl) {
+        domEl.removeEventListener("mousedown", onMouseDown3D);
+        window.removeEventListener("mousemove", onMouseMove3D);
+        window.removeEventListener("mouseup", onMouseUp3D);
+      }
+      try {
+        renderer?.dispose();
+        if (domEl && container.contains(domEl)) {
+          container.removeChild(domEl);
+        }
+      } catch {}
     };
   }, [activeTab]);
 
@@ -476,10 +491,16 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload | any>>
     camera.position.set(0, 30, 45);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, failIfMajorPerformanceCaveat: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1, 2));
+      container.appendChild(renderer.domElement);
+    } catch (glErr) {
+      console.warn("[Silicon 3D] WebGL context creation failed, skipping 3D viewport:", glErr);
+      return;
+    }
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.9);
     scene.add(ambient);
@@ -539,13 +560,18 @@ export const PcbHardwareCanvas: React.FC<WorkspaceCanvasProps<PcbPayload | any>>
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       stackGroup.rotation.y += 0.006;
-      renderer.render(scene, camera);
+      renderer?.render(scene, camera);
     };
     animate();
 
     return () => {
       cancelAnimationFrame(frameId);
-      renderer.dispose();
+      try {
+        renderer?.dispose();
+        if (renderer?.domElement && container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+      } catch {}
     };
   }, [activeTab]);
 
