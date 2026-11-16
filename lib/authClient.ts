@@ -38,7 +38,17 @@ export function getLocalUser(): LotUser | null {
   const raw = localStorage.getItem(LOCAL_USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
+      return {
+        id: String(parsed.id),
+        email: String(parsed.email || ""),
+        name: String(parsed.name || parsed.email?.split("@")[0] || "User"),
+        avatarUrl: parsed.avatarUrl ? String(parsed.avatarUrl) : undefined,
+        plan: parsed.plan === "pro" ? "pro" : "free",
+      };
+    }
+    return null;
   } catch {
     return null;
   }

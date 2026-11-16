@@ -162,46 +162,55 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-4 space-y-4"
       >
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col justify-center items-center">
-            <WelcomeHero userProfile={userProfile} />
-          </div>
-        ) : (
-          messages.map((message, idx) => {
-            const isLastAssistant =
-              isLoading && idx === messages.length - 1 && message.role === "assistant";
-            const actionPreview =
-              message.role === "assistant" ? extractActionPreview(message.content) : null;
-            const userPrompt =
-              idx > 0 && messages[idx - 1].role === "user"
-                ? messages[idx - 1].content
-                : "";
+      {(() => {
+        const safeMessages = Array.isArray(messages)
+          ? messages.filter((m): m is Message => Boolean(m && typeof m === "object" && typeof m.content === "string"))
+          : [];
+        const lastAssistantIdx = safeMessages.map((m) => m.role).lastIndexOf("assistant");
 
-            // Strictly check if a new user question was started after this message
-            const hasSubsequentUser = messages.slice(idx + 1).some((m) => m.role === "user");
-            const isLatestAssistant =
-              message.role === "assistant" &&
-              idx === messages.map((m) => m.role).lastIndexOf("assistant");
-            const showFollowUps =
-              isLatestAssistant && !hasSubsequentUser && !isLoading;
+        if (safeMessages.length === 0) {
+          return (
+            <div className="h-full flex flex-col justify-center items-center">
+              <WelcomeHero userProfile={userProfile} />
+            </div>
+          );
+        }
 
-            return (
-              <div key={message.id} className="w-full space-y-2">
-                {/* Standard Message Item bubble with markdown & hero card */}
-                <div className="w-full max-w-4xl mx-auto">
-                  <MessageItem
-                    message={message}
-                    userPrompt={userPrompt}
-                    isStreaming={isLastAssistant}
-                    showFollowUps={showFollowUps}
-                    onShareMessage={onShareMessage}
-                    onEditMessage={onEditMessage}
-                    onSelectFollowUp={(q) => onSendMessage(q)}
-                  />
-                </div>
+        return safeMessages.map((message, idx) => {
+          const isLastAssistant =
+            isLoading && idx === safeMessages.length - 1 && message.role === "assistant";
+          const actionPreview =
+            message.role === "assistant" && message.content ? extractActionPreview(message.content) : null;
+          const userPrompt =
+            idx > 0 && safeMessages[idx - 1]?.role === "user"
+              ? safeMessages[idx - 1]?.content || ""
+              : "";
 
-                {/* Embedded Action Card Preview if tool/payload detected */}
-                {actionPreview && (
+          // Strictly check if a new user question was started after this message
+          const hasSubsequentUser = safeMessages.slice(idx + 1).some((m) => m?.role === "user");
+          const isLatestAssistant =
+            message.role === "assistant" &&
+            idx === lastAssistantIdx;
+          const showFollowUps =
+            isLatestAssistant && !hasSubsequentUser && !isLoading;
+
+          return (
+            <div key={message.id || `msg-${idx}`} className="w-full space-y-2">
+              {/* Standard Message Item bubble with markdown & hero card */}
+              <div className="w-full max-w-4xl mx-auto">
+                <MessageItem
+                  message={message}
+                  userPrompt={userPrompt}
+                  isStreaming={isLastAssistant}
+                  showFollowUps={showFollowUps}
+                  onShareMessage={onShareMessage}
+                  onEditMessage={onEditMessage}
+                  onSelectFollowUp={(q) => onSendMessage(q)}
+                />
+              </div>
+
+              {/* Embedded Action Card Preview if tool/payload detected */}
+              {actionPreview && (
                   <div className="w-full max-w-4xl mx-auto my-2">
                     <div className="rounded-xl border border-zinc-800 bg-gradient-to-r from-zinc-900/90 via-zinc-900/60 to-black p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
                       <div className="flex items-center gap-3 min-w-0">
@@ -256,8 +265,8 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                 )}
               </div>
             );
-          })
-        )}
+          });
+        })()}
         <div ref={bottomScrollRef} />
       </div>
 

@@ -1178,25 +1178,37 @@ export default function Home() {
               width: isCanvasVisible ? `${splitWidth}%` : "100%",
             }}
           >
-            <CognitiveStream
-              mode={activeMode}
-              onSelectMode={handleSelectMode}
-              messages={activeConversation ? activeConversation.messages : []}
-              isLoading={isLoading}
-              userProfile={userProfile}
-              onSendMessage={handleSendMessage}
-              onStopGeneration={handleStopGeneration}
-              onEditMessage={handleEditMessage}
-              onShareMessage={() => setShareOpen(true)}
-              onOpenActionInCanvas={handleOpenActionInCanvas}
-              searchFocus={searchFocus}
-              onSearchFocusChange={setSearchFocus}
-              onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
-              onOpenLotCode={() => setLotCodeOpen(true)}
-              inputDraft={inputDraft}
-              isCanvasVisible={isCanvasVisible}
-              onToggleCanvas={() => setIsCanvasVisible(!isCanvasVisible)}
-            />
+            <WorkspaceErrorBoundary
+              fallbackTitle="Cognitive Stream Recovered"
+              onReset={() => {
+                setActiveConvId(null);
+                setStoredCurrentConvId(null);
+              }}
+            >
+              <CognitiveStream
+                mode={activeMode}
+                onSelectMode={handleSelectMode}
+                messages={
+                  activeConversation && Array.isArray(activeConversation.messages)
+                    ? activeConversation.messages.filter(Boolean)
+                    : []
+                }
+                isLoading={isLoading}
+                userProfile={userProfile}
+                onSendMessage={handleSendMessage}
+                onStopGeneration={handleStopGeneration}
+                onEditMessage={handleEditMessage}
+                onShareMessage={() => setShareOpen(true)}
+                onOpenActionInCanvas={handleOpenActionInCanvas}
+                searchFocus={searchFocus}
+                onSearchFocusChange={setSearchFocus}
+                onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
+                onOpenLotCode={() => setLotCodeOpen(true)}
+                inputDraft={inputDraft}
+                isCanvasVisible={isCanvasVisible}
+                onToggleCanvas={() => setIsCanvasVisible(!isCanvasVisible)}
+              />
+            </WorkspaceErrorBoundary>
           </div>
 
           {/* DRAGGABLE RESIZER DIVIDER (Visible on Desktop when Canvas is Open) */}

@@ -53,7 +53,20 @@ export function getStoredConversations(): Conversation[] {
   try {
     const raw = localStorage.getItem(KEYS.CONVERSATIONS);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((c) => c && typeof c === "object" && typeof c.id === "string")
+      .map((c) => ({
+        ...c,
+        title: typeof c.title === "string" ? c.title : "New Chat",
+        messages: Array.isArray(c.messages)
+          ? c.messages.filter((m: any) => m && typeof m === "object" && typeof m.content === "string")
+          : [],
+        createdAt: Number(c.createdAt) || Date.now(),
+        updatedAt: Number(c.updatedAt) || Date.now(),
+        modelId: typeof c.modelId === "string" ? c.modelId : DEFAULT_MODEL_ID,
+      }));
   } catch {
     return [];
   }

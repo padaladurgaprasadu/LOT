@@ -120,6 +120,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onShareMessage,
   onSelectFollowUp,
 }) => {
+  if (!message || typeof message !== "object") return null;
+
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState<boolean | null>(null);
   const [codeOutputs, setCodeOutputs] = useState<Record<string, { output: string; isError: boolean }>>({});
@@ -243,16 +245,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  const isThinking = !message.content;
+  const messageContent = typeof message.content === "string" ? message.content : "";
+  const isThinking = !messageContent;
   const isPrismSiliconOr3D =
     !isUser &&
-    message.content &&
-    (/\b(PRISM|Silicon|GPU|TPU|Die Stack|3D|Three\.js|HBM|WebGL)\b/i.test(message.content) &&
-      !message.content.includes("```"));
+    messageContent &&
+    (/\b(PRISM|Silicon|GPU|TPU|Die Stack|3D|Three\.js|HBM|WebGL)\b/i.test(messageContent) &&
+      !messageContent.includes("```"));
 
   const { heroEntity, cleanMarkdown, followUps } = isUser
-    ? { heroEntity: null, cleanMarkdown: message.content, followUps: [] }
-    : cleanModelOutput(message.content, userPrompt);
+    ? { heroEntity: null, cleanMarkdown: messageContent, followUps: [] }
+    : cleanModelOutput(messageContent, userPrompt);
   const normalizedContent = cleanAndNormalizeMarkdown(cleanMarkdown);
 
   // Strict rule: Hero images ONLY show when the model explicitly tagged [HERO: Entity Name]
