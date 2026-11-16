@@ -5,6 +5,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AgentFile, AgentStep } from '@/lib/lotSuperAgent';
 import { FileDiffRecord } from '@/lib/agentPatcher';
 import { Play, Code2, GitCompare, Sparkles, X, AlertTriangle, Terminal, Trash2 } from 'lucide-react';
+import { GitHubWorkspaceBar } from './GitHubWorkspaceBar';
 
 interface LotAgentIDEProps {
   files: Record<string, AgentFile>;
@@ -103,8 +104,6 @@ export function LotAgentIDE({
     return `${interceptor}${html}<style>${css}</style><script>${js}</script>`;
   }, [files]);
 
-  if (filePaths.length === 0 && planSteps.length === 0) return null;
-
   const currentFileObj = files[activeFile];
 
   return (
@@ -173,6 +172,20 @@ export function LotAgentIDE({
         </div>
       </div>
 
+      {/* GitHub 1-Click Repo Importer, Push & ZIP Exporter Bar */}
+      <GitHubWorkspaceBar
+        files={files}
+        activeFilePath={activeFile}
+        onRepoImported={(importedFiles, autoPrompt) => {
+          // Load all imported GitHub files into LOT's Virtual File System
+          Object.entries(importedFiles).forEach(([path, fileObj]) => {
+            onUpdateFile?.(path, fileObj.content);
+          });
+          // Automatically ask LOT Super-Agent to analyze the imported repository
+          onTriggerAutoHeal?.(autoPrompt);
+        }}
+      />
+
       {/* Claude Code-Style Live Execution Plan Bar */}
       {planSteps.length > 0 && (
         <div className="px-4 py-2 bg-neutral-900/50 border-b border-neutral-800 flex flex-wrap gap-2.5 shrink-0">
@@ -231,7 +244,15 @@ export function LotAgentIDE({
 
         {/* Active Viewport */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-          {viewMode === 'preview' && sandboxHtml ? (
+          {filePaths.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-neutral-400">
+              <Code2 className="w-10 h-10 text-neutral-600 mb-3" />
+              <p className="text-sm font-medium text-neutral-200 mb-1">LOT Super-Agent Workspace</p>
+              <p className="text-xs text-neutral-500 max-w-sm">
+                Paste any public or private GitHub repository above to import and edit code in 0ms, or ask LOT to build an app.
+              </p>
+            </div>
+          ) : viewMode === 'preview' && sandboxHtml ? (
             <iframe
               title="LOT 0ms Sandbox"
               srcDoc={sandboxHtml}

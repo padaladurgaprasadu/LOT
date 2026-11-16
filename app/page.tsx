@@ -86,6 +86,7 @@ export default function Home() {
   const [agentFiles, setAgentFiles] = useState<Record<string, AgentFile>>({});
   const [agentDiffs, setAgentDiffs] = useState<FileDiffRecord[]>([]);
   const [agentPlanSteps, setAgentPlanSteps] = useState<AgentStep[]>([]);
+  const [isAgentWorkspaceOpen, setIsAgentWorkspaceOpen] = useState<boolean>(false);
 
   // Streaming generation state
   const [isLoading, setIsLoading] = useState(false);
@@ -992,14 +993,14 @@ export default function Home() {
                 searchFocus={searchFocus}
                 onSearchFocusChange={setSearchFocus}
                 onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
-                onOpenLotCode={() => setLotCodeOpen(true)}
+                onOpenLotCode={() => setIsAgentWorkspaceOpen(true)}
                 inputDraft={inputDraft}
               />
             </WorkspaceErrorBoundary>
           </div>
 
           {/* LOT Super-Agent Closed-Loop IDE Workspace */}
-          {(Object.keys(agentFiles).length > 0 || agentPlanSteps.length > 0) && (
+          {(isAgentWorkspaceOpen || Object.keys(agentFiles).length > 0 || agentPlanSteps.length > 0) && (
             <LotAgentIDE
               files={agentFiles}
               diffs={agentDiffs}
@@ -1020,6 +1021,7 @@ export default function Home() {
                 handleSendMessage(autoHealPrompt);
               }}
               onClose={() => {
+                setIsAgentWorkspaceOpen(false);
                 setAgentFiles({});
                 setAgentPlanSteps([]);
                 setAgentDiffs([]);
