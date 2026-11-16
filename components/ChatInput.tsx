@@ -32,6 +32,7 @@ export interface ChatInputProps {
   onStopGeneration?: () => void;
   onOpenScheduleTasks?: () => void;
   onOpenLotCode?: () => void;
+  onOpenBrowserAgent?: () => void;
   externalInput?: string;
   searchFocus?: IndustryFocus;
   onSearchFocusChange?: (focus: IndustryFocus) => void;
@@ -45,6 +46,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onStopGeneration,
   onOpenScheduleTasks,
   onOpenLotCode,
+  onOpenBrowserAgent,
   externalInput,
   searchFocus = "all",
   onSearchFocusChange,
@@ -483,9 +485,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setInput("Navigate and execute browser-use task on: ");
+                    if (onOpenBrowserAgent) {
+                      onOpenBrowserAgent();
+                    } else {
+                      setInput("Navigate and execute browser-use task on: ");
+                      textareaRef.current?.focus();
+                    }
                     setPlusMenuOpen(false);
-                    textareaRef.current?.focus();
                   }}
                   className="w-full flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
                 >

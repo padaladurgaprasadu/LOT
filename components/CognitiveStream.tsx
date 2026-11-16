@@ -50,6 +50,7 @@ export interface CognitiveStreamProps {
   onSearchFocusChange?: (focus: IndustryFocus) => void;
   onOpenScheduleTasks?: () => void;
   onOpenLotCode?: () => void;
+  onOpenBrowserAgent?: () => void;
   inputDraft?: string;
   isCanvasVisible?: boolean;
   onToggleCanvas?: () => void;
@@ -151,6 +152,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
   onSearchFocusChange,
   onOpenScheduleTasks,
   onOpenLotCode,
+  onOpenBrowserAgent,
   inputDraft = "",
   isCanvasVisible = true,
   onToggleCanvas,
@@ -276,6 +278,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
           onStopGeneration={onStopGeneration}
           onOpenScheduleTasks={onOpenScheduleTasks}
           onOpenLotCode={onOpenLotCode}
+          onOpenBrowserAgent={onOpenBrowserAgent}
           externalInput={inputDraft}
           searchFocus={searchFocus}
           onSearchFocusChange={onSearchFocusChange}

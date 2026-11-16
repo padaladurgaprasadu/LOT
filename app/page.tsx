@@ -14,6 +14,7 @@ import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
 import { LotCodeModal } from "../components/LotCodeModal";
 import { LotAgentIDE } from "../components/LotAgentIDE";
+import { LotBrowserAgent } from "../components/LotBrowserAgent";
 import { AgentFile, AgentStep } from "@/lib/lotSuperAgent";
 import { FileDiffRecord, parseLiveAgentStream } from "@/lib/agentPatcher";
 import { LotUser, getLocalUser, setLocalUser, supabase, extractFirstName } from "@/lib/authClient";
@@ -87,6 +88,7 @@ export default function Home() {
   const [agentDiffs, setAgentDiffs] = useState<FileDiffRecord[]>([]);
   const [agentPlanSteps, setAgentPlanSteps] = useState<AgentStep[]>([]);
   const [isAgentWorkspaceOpen, setIsAgentWorkspaceOpen] = useState<boolean>(false);
+  const [isBrowserAgentOpen, setIsBrowserAgentOpen] = useState<boolean>(false);
 
   // Streaming generation state
   const [isLoading, setIsLoading] = useState(false);
@@ -994,6 +996,7 @@ export default function Home() {
                 onSearchFocusChange={setSearchFocus}
                 onOpenScheduleTasks={() => setScheduleTasksOpen(true)}
                 onOpenLotCode={() => setIsAgentWorkspaceOpen(true)}
+                onOpenBrowserAgent={() => setIsBrowserAgentOpen(true)}
                 inputDraft={inputDraft}
               />
             </WorkspaceErrorBoundary>
@@ -1032,6 +1035,19 @@ export default function Home() {
       </div>
 
       {/* Modals & Dialogs */}
+      {/* LOT Browser Agent (browser-use) Live Viewport Modal */}
+      {isBrowserAgentOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <LotBrowserAgent
+              onClose={() => setIsBrowserAgentOpen(false)}
+              onFinalResult={(answer) => {
+                handleSendMessage(`[LOT Browser Agent Task Result]:\n${answer}`);
+              }}
+            />
+          </div>
+        </div>
+      )}
       <LotCodeModal isOpen={lotCodeOpen} onClose={() => setLotCodeOpen(false)} />
       <SkillsMarketplaceModal
         isOpen={skillsMarketplaceOpen}
