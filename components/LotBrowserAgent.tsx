@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Globe, Lock, X, Play, RotateCw, ExternalLink, Sparkles, CheckCircle2 } from "lucide-react";
+import { Globe, Lock, X, Play, RotateCw, ExternalLink, Sparkles, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
 
 interface BrowserStep {
   step: number;
@@ -28,8 +28,48 @@ export function LotBrowserAgent({
   const [steps, setSteps] = useState<BrowserStep[]>([]);
   const [currentScreenshot, setCurrentScreenshot] = useState<string | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("about:blank");
+  const [urlInput, setUrlInput] = useState<string>("about:blank");
+  const [history, setHistory] = useState<string[]>(["about:blank"]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
   const [isRunning, setIsRunning] = useState(false);
   const [finalResult, setFinalResult] = useState<string | null>(null);
+
+  const navigateToUrl = (newUrl: string) => {
+    let target = newUrl.trim();
+    if (!target) return;
+    if (!target.startsWith("http://") && !target.startsWith("https://") && target !== "about:blank") {
+      target = `https://${target}`;
+    }
+    setCurrentUrl(target);
+    setUrlInput(target);
+    setHistory((prev) => [...prev.slice(0, historyIndex + 1), target]);
+    setHistoryIndex((prev) => prev + 1);
+    setTaskInput(`Navigate to ${target} and inspect the page content.`);
+  };
+
+  const handleBack = () => {
+    if (historyIndex > 0) {
+      const prevUrl = history[historyIndex - 1];
+      setHistoryIndex((prev) => prev - 1);
+      setCurrentUrl(prevUrl);
+      setUrlInput(prevUrl);
+    }
+  };
+
+  const handleForward = () => {
+    if (historyIndex < history.length - 1) {
+      const nextUrl = history[historyIndex + 1];
+      setHistoryIndex((prev) => prev + 1);
+      setCurrentUrl(nextUrl);
+      setUrlInput(nextUrl);
+    }
+  };
+
+  const handleReload = () => {
+    if (currentUrl && currentUrl !== "about:blank") {
+      setTaskInput(`Refresh and inspect ${currentUrl}`);
+    }
+  };
 
   const startBrowserTask = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -39,11 +79,11 @@ export function LotBrowserAgent({
     setSteps([]);
     setFinalResult(null);
 
-    // Try primary backendUrl, then fall back to internal /api/browser route if external server is offline
-    const endpointsToTry = [
-      `${backendUrl}/api/browser-agent`,
-      "/api/browser",
-    ];
+    // Prevent Mixed Content / CSP errors: on HTTPS production, only use relative /api/browser
+    const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+    const endpointsToTry = isHttps
+      ? ["/api/browser"]
+      : [`${backendUrl}/api/browser-agent`, "/api/browser"];
 
     let success = false;
 
@@ -78,7 +118,9 @@ export function LotBrowserAgent({
               const data = JSON.parse(evt.replace(/^data:\s*/, ""));
 
               if (data.type === "step") {
-                setCurrentUrl(data.url || "https://...");
+                const targetUrl = data.url || "https://...";
+                setCurrentUrl(targetUrl);
+                setUrlInput(targetUrl);
                 if (data.screenshot) {
                   setCurrentScreenshot(`data:image/jpeg;base64,${data.screenshot}`);
                 }
@@ -107,7 +149,9 @@ export function LotBrowserAgent({
         if (jsonData?.session) {
           success = true;
           const sess = jsonData.session;
-          setCurrentUrl(sess.currentUrl);
+          const targetUrl = sess.currentUrl || "https://...";
+          setCurrentUrl(targetUrl);
+          setUrlInput(targetUrl);
           const mappedSteps: BrowserStep[] = (sess.steps || []).map((s: any) => ({
             step: s.step,
             url: sess.currentUrl,
@@ -134,18 +178,65 @@ export function LotBrowserAgent({
 
   return (
     <div className="w-full max-w-4xl mx-auto rounded-2xl border border-neutral-800 bg-neutral-950 overflow-hidden text-neutral-100 my-4 shadow-2xl animate-in fade-in duration-200">
-      {/* Top Browser Address Bar */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-black border-b border-neutral-800">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
-          <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+      {/* Top Browser Address Bar & Navigation Controls */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-black border-b border-neutral-800">
+        <div className="flex items-center gap-2">
+          {/* Window Traffic Lights */}
+          <div className="flex items-center gap-1.5 mr-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+          </div>
+
+          {/* Back, Forward, Reload Navigation Buttons */}
+          <button
+            type="button"
+            onClick={handleBack}
+            disabled={historyIndex <= 0 || isRunning}
+            className="p-1 rounded text-neutral-400 hover:text-white disabled:opacity-30 transition"
+            title="Back"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleForward}
+            disabled={historyIndex >= history.length - 1 || isRunning}
+            className="p-1 rounded text-neutral-400 hover:text-white disabled:opacity-30 transition"
+            title="Forward"
+          >
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleReload}
+            disabled={isRunning}
+            className={`p-1 rounded text-neutral-400 hover:text-white disabled:opacity-30 transition ${
+              isRunning ? "animate-spin text-emerald-400" : ""
+            }`}
+            title="Reload page"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <div className="flex-1 max-w-xl mx-2 flex items-center gap-2 truncate rounded-lg bg-neutral-900 px-3 py-1 font-mono text-[11px] text-neutral-400 border border-neutral-800">
+        {/* Interactive Address Bar */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            navigateToUrl(urlInput);
+          }}
+          className="flex-1 max-w-xl mx-2 flex items-center gap-2 rounded-lg bg-neutral-900 px-3 py-1 font-mono text-[11px] text-neutral-200 border border-neutral-800 focus-within:border-neutral-600"
+        >
           <Lock className="w-3 h-3 text-emerald-400 shrink-0" />
-          <span className="truncate">{currentUrl}</span>
-        </div>
+          <input
+            type="text"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            placeholder="Enter URL to browse (e.g. https://github.com)..."
+            className="w-full bg-transparent outline-none text-white text-[11px] font-mono placeholder-neutral-500 truncate"
+          />
+        </form>
 
         <div className="flex items-center gap-2">
           {isRunning && (
