@@ -15,6 +15,9 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false, // Disables X-Powered-By: Next.js to prevent fingerprinting
   output: "standalone",
+  experimental: {
+    webpackBuildWorker: true,
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
