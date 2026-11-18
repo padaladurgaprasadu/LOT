@@ -13,7 +13,7 @@ import { ShareModal } from "../components/ShareModal";
 import { MeetingAssistantModal } from "../components/MeetingAssistantModal";
 import { SkillsMarketplaceModal } from "../components/SkillsMarketplaceModal";
 import { LotCodeModal } from "../components/LotCodeModal";
-import { LotAgentIDE } from "../components/LotAgentIDE";
+import { LotAgentIDE, VerificationReport } from "../components/LotAgentIDE";
 import { LotBrowserAgent } from "../components/LotBrowserAgent";
 import { AgentFile, AgentStep } from "@/lib/lotSuperAgent";
 import { FileDiffRecord, parseLiveAgentStream } from "@/lib/agentPatcher";
@@ -89,6 +89,11 @@ export default function Home() {
   const [agentPlanSteps, setAgentPlanSteps] = useState<AgentStep[]>([]);
   const [isAgentWorkspaceOpen, setIsAgentWorkspaceOpen] = useState<boolean>(false);
   const [isBrowserAgentOpen, setIsBrowserAgentOpen] = useState<boolean>(false);
+  const [revisionHistory, setRevisionHistory] = useState<
+    Array<{ timestamp: number; label: string; files: Record<string, AgentFile> }>
+  >([]);
+  const [verificationReport, setVerificationReport] = useState<VerificationReport | null>(null);
+  const preTurnSnapshotRef = useRef<Record<string, AgentFile> | null>(null);
 
   // Streaming generation state
   const [isLoading, setIsLoading] = useState(false);
@@ -518,8 +523,27 @@ export default function Home() {
         content.includes("<lotFile>") ||
         Object.keys(agentFiles).length > 0;
 
-      const endpoint = isCodingAgentQuery ? "/api/agent" : "/api/chat";
-      const requestBody = isCodingAgentQuery
+      // Save snapshot for 1-Click Rollback before starting coding agent turn
+      if (Object.keys(agentFiles).length > 0) {
+        preTurnSnapshotRef.current = { ...agentFiles };
+        setRevisionHistory((prev) => [
+          ...prev.slice(-15),
+          {
+            timestamp: Date.now(),
+            label: `Turn: ${content.slice(0, 30)}`,
+            files: { ...agentFiles },
+          },
+        ]);
+      }
+
+      const isSwarmQuery = content.includes("[SWARM:") || /\b(swarm|multi-agent)\b/i.test(content) && content.includes("[HANDOFF");
+      const endpoint = isSwarmQuery ? "/api/swarm" : isCodingAgentQuery ? "/api/agent" : "/api/chat";
+      const requestBody = isSwarmQuery
+        ? {
+            prompt: content,
+            files: agentFiles,
+          }
+        : isCodingAgentQuery
         ? {
             messages: [...currentConv.messages, userMessage].map((m) => ({
               role: m.role,
@@ -922,6 +946,229 @@ export default function Home() {
     }
   };
 
+  // 1-Click Rollback Handler
+  const handleRollback = (targetPath?: string) => {
+    if (targetPath) {
+      if (preTurnSnapshotRef.current && preTurnSnapshotRef.current[targetPath]) {
+        setAgentFiles((prev) => ({
+          ...prev,
+          [targetPath]: preTurnSnapshotRef.current![targetPath],
+        }));
+      } else if (revisionHistory.length > 0) {
+        for (let i = revisionHistory.length - 1; i >= 0; i--) {
+          const snapFile = revisionHistory[i].files[targetPath];
+          if (snapFile) {
+            setAgentFiles((prev) => ({
+              ...prev,
+              [targetPath]: snapFile,
+            }));
+            break;
+          }
+        }
+      }
+    } else {
+      if (revisionHistory.length > 0) {
+        const lastRev = revisionHistory[revisionHistory.length - 1];
+        setAgentFiles(lastRev.files);
+        setRevisionHistory((prev) => prev.slice(0, -1));
+        if (revisionHistory.length > 1) {
+          preTurnSnapshotRef.current = revisionHistory[revisionHistory.length - 2].files;
+        } else {
+          preTurnSnapshotRef.current = null;
+        }
+      } else if (preTurnSnapshotRef.current) {
+        setAgentFiles(preTurnSnapshotRef.current);
+        preTurnSnapshotRef.current = null;
+      }
+    }
+  };
+
+  // Interactive Hunk Review Handlers
+  const handleAcceptHunk = (filePath: string, hunkId: string) => {
+    setAgentDiffs((prev) =>
+      prev.map((d) => {
+        if (d.path === filePath) {
+          const hunks = (d as any).hunks;
+          if (Array.isArray(hunks)) {
+            return {
+              ...d,
+              hunks: hunks.map((h: any) =>
+                h.id === hunkId ? { ...h, status: 'accepted' } : h
+              ),
+            };
+          }
+        }
+        return d;
+      })
+    );
+  };
+
+  const handleRejectHunk = (filePath: string, hunkId: string) => {
+    setAgentDiffs((prev) =>
+      prev.map((d) => {
+        if (d.path === filePath) {
+          const hunks = (d as any).hunks;
+          if (Array.isArray(hunks)) {
+            return {
+              ...d,
+              hunks: hunks.map((h: any) =>
+                h.id === hunkId ? { ...h, status: 'rejected' } : h
+              ),
+            };
+          }
+        }
+        return d;
+      })
+    );
+    if (preTurnSnapshotRef.current && preTurnSnapshotRef.current[filePath]) {
+      setAgentFiles((prev) => ({
+        ...prev,
+        [filePath]: preTurnSnapshotRef.current![filePath],
+      }));
+    }
+  };
+
+  const handleAcceptAllDiffs = () => {
+    setAgentDiffs((prev) =>
+      prev.map((d) => {
+        const hunks = (d as any).hunks;
+        if (Array.isArray(hunks)) {
+          return {
+            ...d,
+            hunks: hunks.map((h: any) => ({ ...h, status: 'accepted' })),
+          };
+        }
+        return d;
+      })
+    );
+  };
+
+  const handleRejectAllDiffs = () => {
+    setAgentDiffs((prev) =>
+      prev.map((d) => {
+        const hunks = (d as any).hunks;
+        if (Array.isArray(hunks)) {
+          return {
+            ...d,
+            hunks: hunks.map((h: any) => ({ ...h, status: 'rejected' })),
+          };
+        }
+        return d;
+      })
+    );
+    if (preTurnSnapshotRef.current) {
+      setAgentFiles(preTurnSnapshotRef.current);
+    }
+  };
+
+  // Automated Verification Runner
+  const handleRunVerification = async () => {
+    setVerificationReport({
+      status: 'running',
+      totalChecks: 0,
+      passedChecks: 0,
+      syntaxErrors: [],
+      runtimeErrors: [],
+      timestamp: Date.now(),
+    });
+
+    const syntaxErrors: Array<{ file: string; line?: number; message: string }> = [];
+    const fileEntries = Object.entries(agentFiles);
+    const totalChecks = fileEntries.length;
+
+    for (const [path, fileObj] of fileEntries) {
+      const code = fileObj.content || '';
+      const ext = path.split('.').pop()?.toLowerCase();
+
+      if (ext === 'json') {
+        try {
+          JSON.parse(code);
+        } catch (e: any) {
+          syntaxErrors.push({
+            file: path,
+            message: `Malformed JSON: ${e?.message || 'Parse error'}`,
+          });
+        }
+      } else if (
+        ext === 'js' ||
+        ext === 'jsx' ||
+        ext === 'ts' ||
+        ext === 'tsx' ||
+        ext === 'html' ||
+        ext === 'css'
+      ) {
+        let brace = 0,
+          paren = 0,
+          bracket = 0;
+        let inStr = false;
+        let quoteChar = '';
+        const lines = code.split(/\r?\n/);
+
+        for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+          const line = lines[lineIdx];
+          for (let colIdx = 0; colIdx < line.length; colIdx++) {
+            const ch = line[colIdx];
+            const prev = colIdx > 0 ? line[colIdx - 1] : '';
+
+            if (inStr) {
+              if (ch === quoteChar && prev !== '\\') inStr = false;
+            } else {
+              if (ch === '"' || ch === "'" || ch === '`') {
+                inStr = true;
+                quoteChar = ch;
+              } else if (ch === '{') brace++;
+              else if (ch === '}') brace--;
+              else if (ch === '(') paren++;
+              else if (ch === ')') paren--;
+              else if (ch === '[') bracket++;
+              else if (ch === ']') bracket--;
+            }
+          }
+
+          if (brace < 0 || paren < 0 || bracket < 0) {
+            syntaxErrors.push({
+              file: path,
+              line: lineIdx + 1,
+              message: `Mismatched closing bracket/brace/paren at line ${lineIdx + 1}`,
+            });
+            break;
+          }
+        }
+
+        if (syntaxErrors.filter((e) => e.file === path).length === 0) {
+          if (brace !== 0) {
+            syntaxErrors.push({
+              file: path,
+              message: `Unclosed brace '{' (balance: ${brace})`,
+            });
+          } else if (paren !== 0) {
+            syntaxErrors.push({
+              file: path,
+              message: `Unclosed parenthesis '(' (balance: ${paren})`,
+            });
+          } else if (bracket !== 0) {
+            syntaxErrors.push({
+              file: path,
+              message: `Unclosed square bracket '[' (balance: ${bracket})`,
+            });
+          }
+        }
+      }
+    }
+
+    const passedChecks = Math.max(0, totalChecks - syntaxErrors.length);
+    const isPassed = syntaxErrors.length === 0;
+
+    setVerificationReport({
+      status: isPassed ? 'passed' : 'failed',
+      totalChecks,
+      passedChecks,
+      syntaxErrors,
+      runtimeErrors: [],
+      timestamp: Date.now(),
+    });
+  };
+
   return (
     <div
       ref={containerRef}
@@ -1009,6 +1256,8 @@ export default function Home() {
               diffs={agentDiffs}
               planSteps={agentPlanSteps}
               isStreaming={isLoading}
+              canRollback={Boolean(preTurnSnapshotRef.current || revisionHistory.length > 0)}
+              verificationReport={verificationReport}
               onUpdateFile={(path, content) => {
                 setAgentFiles((prev) => ({
                   ...prev,
@@ -1020,6 +1269,12 @@ export default function Home() {
                   },
                 }));
               }}
+              onAcceptHunk={handleAcceptHunk}
+              onRejectHunk={handleRejectHunk}
+              onAcceptAllDiffs={handleAcceptAllDiffs}
+              onRejectAllDiffs={handleRejectAllDiffs}
+              onRollback={handleRollback}
+              onRunVerification={handleRunVerification}
               onTriggerAutoHeal={(autoHealPrompt) => {
                 handleSendMessage(autoHealPrompt);
               }}
@@ -1028,6 +1283,7 @@ export default function Home() {
                 setAgentFiles({});
                 setAgentPlanSteps([]);
                 setAgentDiffs([]);
+                setVerificationReport(null);
               }}
             />
           )}

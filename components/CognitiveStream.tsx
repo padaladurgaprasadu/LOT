@@ -9,6 +9,9 @@ import { MessageItem } from "@/components/MessageItem";
 import { ThinkingBlock } from "@/components/chat/ThinkingBlock";
 import { WelcomeHero } from "@/components/WelcomeHero";
 import { ChatInput } from "@/components/ChatInput";
+import { SwarmSelectorBar } from "@/components/SwarmSelectorBar";
+import { LotMeetilyAndVoice } from "@/components/LotMeetilyAndVoice";
+import { AgentId, LOT_DOMAIN_AGENTS } from "@/lib/lotSwarmOrchestrator";
 import {
   Sparkles,
   ExternalLink,
@@ -159,6 +162,18 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
 }) => {
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedSwarmAgents, setSelectedSwarmAgents] = useState<AgentId[]>([]);
+
+  const handleSendWithSwarm = (text: string, attachment?: Attachment, focus?: IndustryFocus) => {
+    let finalMsg = text;
+    if (selectedSwarmAgents.length > 0) {
+      const agentNames = selectedSwarmAgents
+        .map((id) => LOT_DOMAIN_AGENTS[id]?.name || id)
+        .join(", ");
+      finalMsg = `[SWARM: ${agentNames}]\n${text}`;
+    }
+    onSendMessage(finalMsg, attachment, focus);
+  };
 
   // Auto-scroll on new messages or during streaming
   useEffect(() => {
@@ -272,8 +287,28 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
 
       {/* Bottom Floating Chat Input */}
       <div className="shrink-0 w-full bg-[#000000] border-t border-zinc-900 pt-2 pb-2 px-3 sm:px-4">
+        {/* Domain Agents Swarm Selector Bar */}
+        <SwarmSelectorBar
+          selectedAgents={selectedSwarmAgents}
+          onToggleAgent={(id) => {
+            setSelectedSwarmAgents((prev) =>
+              prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+            );
+          }}
+        />
+
+        {/* Meetily Meeting Intelligence + Whisper Voice Assistant */}
+        <LotMeetilyAndVoice
+          onVoicePrompt={(voiceText) => {
+            handleSendWithSwarm(voiceText);
+          }}
+          onMeetingDocGenerated={(doc) => {
+            console.log("Meeting minutes generated successfully:", doc.length);
+          }}
+        />
+
         <ChatInput
-          onSendMessage={onSendMessage}
+          onSendMessage={handleSendWithSwarm}
           isLoading={isLoading}
           onStopGeneration={onStopGeneration}
           onOpenScheduleTasks={onOpenScheduleTasks}

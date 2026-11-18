@@ -1,5 +1,6 @@
 // lib/agentPatcher.ts
 import { AgentFile, AgentStep } from './lotSuperAgent';
+import { applySearchReplacePatch, parseSearchReplaceHunks } from './diff/diffEngine';
 
 export interface FileDiffRecord {
   path: string;
@@ -7,31 +8,25 @@ export interface FileDiffRecord {
   addedLines: string[];
 }
 
+/**
+ * Applies surgical diff using the resilient two-stage diffEngine.
+ * Maintains 100% API compatibility with existing callers.
+ */
 export function applySurgicalDiff(
   original: string,
   diffBlock: string
 ): { updated: string; removed: string[]; added: string[] } {
-  let updated = original;
   const removed: string[] = [];
   const added: string[] = [];
 
-  const regex =
-    /<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>> REPLACE/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(diffBlock)) !== null) {
-    const searchStr = match[1];
-    const replaceStr = match[2];
-
-    removed.push(...searchStr.split('\n'));
-    added.push(...replaceStr.split('\n'));
-
-    if (updated.includes(searchStr)) {
-      updated = updated.replace(searchStr, replaceStr);
-    } else if (searchStr.trim() && updated.includes(searchStr.trim())) {
-      updated = updated.replace(searchStr.trim(), replaceStr.trim());
-    }
+  const hunks = parseSearchReplaceHunks(diffBlock);
+  for (const hunk of hunks) {
+    removed.push(...hunk.searchBlock.split(/\r?\n/));
+    added.push(...hunk.replaceBlock.split(/\r?\n/));
   }
+
+  const patchResult = applySearchReplacePatch(original, diffBlock, 'workspace-diff');
+  const updated = patchResult.success ? patchResult.patchedContent : original;
 
   return { updated, removed, added };
 }

@@ -3,6 +3,24 @@
  * Manages virtual repository file trees, AST symbol indexing, and fuzzy diff patch application.
  */
 
+import {
+  generateRepoMap as generateRepoMapEngine,
+  parseTypeScriptFile,
+  parsePythonFile,
+  AstSymbol,
+  RepoMapResult,
+  TopSymbolSummary
+} from "../ast/repoMapEngine";
+
+export {
+  generateRepoMap,
+  parseTypeScriptAst,
+  parsePythonAst,
+  computePageRank,
+  formatRepoMap
+} from "../ast/repoMapEngine";
+export type { AstSymbol, RepoMapResult, TopSymbolSummary } from "../ast/types";
+
 export interface WorkspaceFile {
   path: string;
   content: string;
@@ -115,6 +133,7 @@ export class LotCodeWorkspace {
 
   /**
    * AST Symbol Extraction & Repository Mapping (Aider & OpenCode standard)
+   * Connects to high-performance AST Engine (tsAstParser & pythonAstParser)
    */
   public extractAST(path: string): FileASTInfo {
     const file = this.getFile(path);
@@ -122,104 +141,81 @@ export class LotCodeWorkspace {
       return { path, symbols: [], imports: [], exports: [], rankScore: 0 };
     }
 
-    const lines = file.content.split("\n");
-    const symbols: SymbolInfo[] = [];
-    const imports: string[] = [];
-    const exports: string[] = [];
+    const cleanPath = path.replace(/\\/g, "/");
+    let parsedSymbols: AstSymbol[] = [];
+    let parsedImports: string[] = [];
+    let parsedExports: string[] = [];
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const lineNum = i + 1;
-
-      // Imports
-      const importMatch = line.match(/^import\s+.*?from\s+['"](.*?)['"]/);
-      if (importMatch) {
-        imports.push(importMatch[1]);
-      }
-
-      // Functions
-      const fnMatch = line.match(/(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\((.*?)\)/);
-      if (fnMatch) {
-        symbols.push({
-          name: fnMatch[1],
-          kind: "function",
-          line: lineNum,
-          signature: line.replace(/\{.*$/, "").trim(),
-        });
-        if (line.startsWith("export")) exports.push(fnMatch[1]);
-      }
-
-      // Classes
-      const classMatch = line.match(/(?:export\s+)?class\s+([a-zA-Z0-9_$]+)/);
-      if (classMatch) {
-        symbols.push({
-          name: classMatch[1],
-          kind: "class",
-          line: lineNum,
-          signature: line.replace(/\{.*$/, "").trim(),
-        });
-        if (line.startsWith("export")) exports.push(classMatch[1]);
-      }
-
-      // Interfaces & Types
-      const ifaceMatch = line.match(/(?:export\s+)?interface\s+([a-zA-Z0-9_$]+)/);
-      if (ifaceMatch) {
-        symbols.push({
-          name: ifaceMatch[1],
-          kind: "interface",
-          line: lineNum,
-          signature: line.replace(/\{.*$/, "").trim(),
-        });
-        if (line.startsWith("export")) exports.push(ifaceMatch[1]);
-      }
-
-      const typeMatch = line.match(/(?:export\s+)?type\s+([a-zA-Z0-9_$]+)\s*=/);
-      if (typeMatch) {
-        symbols.push({
-          name: typeMatch[1],
-          kind: "type",
-          line: lineNum,
-          signature: line.trim(),
-        });
-        if (line.startsWith("export")) exports.push(typeMatch[1]);
+    if (/\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/i.test(cleanPath)) {
+      const res = parseTypeScriptFile(cleanPath, file.content);
+      parsedSymbols = res.symbols;
+      parsedImports = res.imports.map(i => i.source);
+      parsedExports = res.exports;
+    } else if (/\.py$/i.test(cleanPath)) {
+      const res = parsePythonFile(cleanPath, file.content);
+      parsedSymbols = res.symbols;
+      parsedImports = res.imports.map(i => i.source);
+      parsedExports = res.exports;
+    } else {
+      // Fallback for non-TS/Py files using line regex
+      const lines = file.content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        const lineNum = i + 1;
+        const fnMatch = line.match(/(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\((.*?)\)/);
+        if (fnMatch) {
+          parsedSymbols.push({
+            id: `${cleanPath}#${fnMatch[1]}`,
+            name: fnMatch[1],
+            filePath: cleanPath,
+            kind: "function",
+            line: lineNum,
+            signature: line.replace(/\{.*$/, "").trim(),
+            outgoingRefs: new Set()
+          });
+          if (line.startsWith("export")) parsedExports.push(fnMatch[1]);
+        }
       }
     }
+
+    const symbols: SymbolInfo[] = parsedSymbols.map(s => ({
+      name: s.name,
+      kind: (s.kind === "method" ? "function" : s.kind === "variable" ? "const" : s.kind) as any,
+      line: s.line,
+      signature: s.signature,
+    }));
 
     return {
       path,
       symbols,
-      imports,
-      exports,
-      rankScore: symbols.length * 2 + exports.length * 3 + imports.length,
+      imports: parsedImports,
+      exports: parsedExports,
+      rankScore: symbols.length * 2 + parsedExports.length * 3 + parsedImports.length,
     };
   }
 
   /**
    * Generates a compact, high-signal Repo Map for context injection
+   * Computes directed symbol graph and in-memory PageRank within token budget.
    */
-  public generateRepoMap(): string {
-    const astList: FileASTInfo[] = [];
-    for (const path of this.listFiles()) {
-      astList.push(this.extractAST(path));
+  public generateRepoMap(maxTokens: number = 1500): string {
+    const filesRecord: Record<string, { path: string; content: string }> = {};
+    for (const [p, file] of this.files.entries()) {
+      filesRecord[p] = { path: file.path, content: file.content };
     }
+    const result = generateRepoMapEngine(filesRecord, maxTokens);
+    return result.formattedMap;
+  }
 
-    astList.sort((a, b) => b.rankScore - a.rankScore);
-
-    let mapText = "### LOT WORKSPACE REPOSITORY TOPOLOGY MAP\n\n";
-    for (const ast of astList) {
-      mapText += `📁 **${ast.path}** (Rank: ${ast.rankScore})\n`;
-      if (ast.exports.length > 0) {
-        mapText += `  ├── Exports: ${ast.exports.join(", ")}\n`;
-      }
-      for (const sym of ast.symbols.slice(0, 8)) {
-        mapText += `  │   • [${sym.kind}] \`${sym.signature}\` (line ${sym.line})\n`;
-      }
-      if (ast.symbols.length > 8) {
-        mapText += `  │   • ... (+${ast.symbols.length - 8} more symbols)\n`;
-      }
+  /**
+   * Generates full structured Repo Map result with PageRank rankings
+   */
+  public generateRepoMapDetails(maxTokens: number = 1500): RepoMapResult {
+    const filesRecord: Record<string, { path: string; content: string }> = {};
+    for (const [p, file] of this.files.entries()) {
+      filesRecord[p] = { path: file.path, content: file.content };
     }
-
-    return mapText.trim();
+    return generateRepoMapEngine(filesRecord, maxTokens);
   }
 
   /**
