@@ -52,6 +52,7 @@ hardware/
 *PATENT*
 *GPU*
 *gpu*
+!lib/client-ml/
 FORM_*.md
 *.vcd
 *.vvp
