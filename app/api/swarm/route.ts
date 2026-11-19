@@ -10,6 +10,18 @@ import { generateAiderRepoMap, WorkspaceFile } from '@/lib/repoMap';
 export const runtime = 'nodejs';
 
 function getOpenAIClient(): OpenAI {
+  const localUrl =
+    process.env.LOCAL_LLM_URL ||
+    process.env.OLLAMA_BASE_URL ||
+    (process.env.OFFLINE_MODE === "true" ? "http://127.0.0.1:11434/v1" : null);
+
+  if (localUrl) {
+    return new OpenAI({
+      baseURL: localUrl,
+      apiKey: "ollama",
+    });
+  }
+
   const apiKey =
     process.env.NVIDIA_API_KEY ||
     process.env.OPENROUTER_API_KEY ||

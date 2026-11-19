@@ -21,8 +21,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Connect NVIDIA NIM API to browser-use (Zero OpenAI cost)
+# Connect Local Ollama or NVIDIA NIM API to browser-use
 def get_nvidia_llm():
+    local_url = os.environ.get("LOCAL_LLM_URL") or os.environ.get("OLLAMA_BASE_URL")
+    if local_url:
+        return ChatOpenAI(
+            base_url=local_url,
+            api_key=os.environ.get("LOCAL_LLM_API_KEY", "ollama"),
+            model=os.environ.get("LOCAL_LLM_MODEL", "qwen2.5-coder:7b"),
+            temperature=0.1,
+        )
     return ChatOpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=os.environ.get("NVIDIA_API_KEY", "YOUR_NVIDIA_API_KEY"),

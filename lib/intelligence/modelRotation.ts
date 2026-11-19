@@ -649,9 +649,51 @@ async function callOpenRouter(
   return null;
 }
 
+async function callLocalLlm(
+  messages: Array<{ role: string; content: string }>,
+  options?: ModelExecutionOptions
+): Promise<ModelResponse | null> {
+  const localUrl =
+    process.env.LOCAL_LLM_URL ||
+    process.env.OLLAMA_BASE_URL ||
+    (process.env.OFFLINE_MODE === "true" ? "http://127.0.0.1:11434/v1" : null);
+
+  if (!localUrl) return null;
+
+  try {
+    const res = await fetch(`${localUrl.replace(/\/+$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: options?.preferredModel || process.env.LOCAL_LLM_MODEL || "qwen2.5-coder:7b",
+        messages,
+        temperature: options?.temperature ?? 0.1,
+        max_tokens: options?.maxTokens ?? 2048,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const content = data?.choices?.[0]?.message?.content || "";
+    if (!content) return null;
+
+    return {
+      content,
+      modelUsed: data.model || "local-llm",
+      provider: "sovereign",
+      fallbackOccurred: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Execute chat completion with cascading multi-provider failover rotation.
  * Priority order:
+ * 0. Local Offline LLM (Ollama / vLLM / LM Studio)
  * 1. NVIDIA NIM (deepseek-ai/deepseek-r1, meta/llama-3.3-70b-instruct)
  * 2. Groq (llama-3.3-70b-versatile, mixtral-8x7b-32768)
  * 3. OpenRouter (meta-llama/llama-3.3-70b-instruct, anthropic/claude-3.5-sonnet)
@@ -663,6 +705,14 @@ export async function executeModelWithFailover(
   messages: Array<{ role: string; content: string }>,
   options?: ModelExecutionOptions
 ): Promise<ModelResponse> {
+  // 0. Attempt Local Offline LLM (Ollama / LM Studio) if configured
+  try {
+    const localRes = await callLocalLlm(messages, options);
+    if (localRes) return localRes;
+  } catch {
+    // Failover to next provider
+  }
+
   // 1. Attempt NVIDIA NIM
   try {
     const nimRes = await callNvidiaNim(messages, options);
