@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import { diarizeMeetingTranscript, formatDiarizedMinutesMarkdown } from '@/lib/meeting/speakerDiarizer';
 
 interface MeetilyProps {
   onVoicePrompt: (transcribedText: string) => void;
@@ -113,34 +114,38 @@ export function LotMeetilyAndVoice({
     setIsSummarizing(true);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'user',
-              content: `You are Meetily AI Meeting Intelligence. Convert this raw Google Meet / Zoom transcript into a professional Employee Reference Document containing:
-1. Meeting Title & Date
-2. Executive Summary
-3. Key Decisions Made
-4. Action Items Table (Task | Owner | Priority)
-5. Detailed Topic Breakdown
+      // 1. Instant Neural Speaker Diarization
+      const diarized = diarizeMeetingTranscript(meetingTranscript);
+      const diarizedDoc = formatDiarizedMinutesMarkdown(diarized);
+      setMeetingMinutes(diarizedDoc);
+      onMeetingDocGenerated?.(diarizedDoc);
 
-RAW TRANSCRIPT:
-${meetingTranscript}`,
-            },
-          ],
-        }),
-      });
+      // 2. Also query remote model if available for additional executive insights
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'user',
+                content: `You are Meetily AI Meeting Intelligence. Refine this diarized meeting record with key executive takeaways:\n\n${diarizedDoc}`,
+              },
+            ],
+          }),
+          signal: AbortSignal.timeout(4000),
+        });
 
-      const docText = await res.text();
-      setMeetingMinutes(docText);
-      if (onMeetingDocGenerated) {
-        onMeetingDocGenerated(docText);
+        if (res.ok) {
+          const docText = await res.text();
+          if (docText && !docText.includes('LOT-OS Sovereign') && docText.length > 50) {
+            setMeetingMinutes(docText);
+            onMeetingDocGenerated?.(docText);
+          }
+        }
+      } catch {
+        // Kept diarized doc
       }
-    } catch (err) {
-      console.error('Failed to generate meeting minutes:', err);
     } finally {
       setIsSummarizing(false);
     }

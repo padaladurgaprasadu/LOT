@@ -11,7 +11,8 @@ export type AgentId =
   | 'data_analyst'
   | 'vlsi_architect'
   | 'embedded_ai'
-  | 'tutor_agent';
+  | 'tutor_agent'
+  | 'security_gatekeeper';
 
 export interface DomainAgentSpec {
   id: AgentId;
@@ -133,6 +134,16 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     domainKeywords: /\b(explain|teach|tutor|gate|step by step|intuition|why does|how does|concept|example|quiz)\b/i,
     systemInstruction:
       'You are the Master Socratic Tutor Agent. Explain complex concepts with crystal-clear intuition, real-world analogies, step-by-step worked derivations, and 2 quick check-your-understanding questions.',
+  },
+  security_gatekeeper: {
+    id: 'security_gatekeeper',
+    name: 'Red-Team Security Gatekeeper',
+    badge: '🛡️ Security',
+    preferredModel: 'meta/llama-3.3-70b-instruct',
+    temperature: 0.1,
+    domainKeywords: /\b(security|vulnerability|audit|owasp|sqli|xss|jwt|auth|leak|sanitize|safe)\b/i,
+    systemInstruction:
+      'You are the Red-Team Security Gatekeeper Agent. Audit code for OWASP Top 10 vulnerabilities, leaked secrets, SQL injection, and memory leaks. Emit a structured [SECURITY VERDICT: PASS/FAIL] with required remediations.',
   },
 };
 
