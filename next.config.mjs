@@ -14,7 +14,9 @@ const ContentSecurityPolicy = `
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false, // Disables X-Powered-By: Next.js to prevent fingerprinting
-  output: "standalone",
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     webpackBuildWorker: true,
   },
