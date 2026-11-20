@@ -9,7 +9,6 @@ import { MessageItem } from "@/components/MessageItem";
 import { ThinkingBlock } from "@/components/chat/ThinkingBlock";
 import { WelcomeHero } from "@/components/WelcomeHero";
 import { ChatInput } from "@/components/ChatInput";
-import { SwarmSelectorBar } from "@/components/SwarmSelectorBar";
 import { LotMeetilyAndVoice } from "@/components/LotMeetilyAndVoice";
 import { AgentId, LOT_DOMAIN_AGENTS } from "@/lib/lotSwarmOrchestrator";
 import {
@@ -163,6 +162,16 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [selectedSwarmAgents, setSelectedSwarmAgents] = useState<AgentId[]>([]);
+  const [triggerMeeting, setTriggerMeeting] = useState<number>(0);
+
+  const handleEditMessageInternal = (id: string, text: string) => {
+    if (onEditMessage) {
+      onEditMessage(id, text);
+    }
+    setTimeout(() => {
+      bottomScrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  };
 
   const handleSendWithSwarm = (text: string, attachment?: Attachment, focus?: IndustryFocus) => {
     let finalMsg = text;
@@ -231,7 +240,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
                   isStreaming={isLastAssistant}
                   showFollowUps={showFollowUps}
                   onShareMessage={onShareMessage}
-                  onEditMessage={onEditMessage}
+                  onEditMessage={handleEditMessageInternal}
                   onSelectFollowUp={(q) => onSendMessage(q)}
                 />
               </div>
@@ -287,18 +296,9 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
 
       {/* Bottom Floating Chat Input */}
       <div className="shrink-0 w-full bg-[#000000] border-t border-zinc-900 pt-2 pb-2 px-3 sm:px-4">
-        {/* Domain Agents Swarm Selector Bar */}
-        <SwarmSelectorBar
-          selectedAgents={selectedSwarmAgents}
-          onToggleAgent={(id) => {
-            setSelectedSwarmAgents((prev) =>
-              prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-            );
-          }}
-        />
-
-        {/* Meetily Meeting Intelligence + Whisper Voice Assistant */}
+        {/* Meetily Meeting Intelligence (Rendered only when active recording or doc generated) */}
         <LotMeetilyAndVoice
+          triggerMeetingCapture={triggerMeeting}
           onVoicePrompt={(voiceText) => {
             handleSendWithSwarm(voiceText);
           }}
@@ -319,6 +319,14 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
           onSearchFocusChange={onSearchFocusChange}
           activeMode={mode}
           onSelectMode={(m) => onSelectMode(m as LotOsMode)}
+          selectedSwarmAgents={selectedSwarmAgents}
+          onToggleSwarmAgent={(id) => {
+            setSelectedSwarmAgents((prev) =>
+              prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+            );
+          }}
+          onClearSwarmAgents={() => setSelectedSwarmAgents([])}
+          onStartMeetily={() => setTriggerMeeting((prev) => prev + 1)}
         />
       </div>
     </div>

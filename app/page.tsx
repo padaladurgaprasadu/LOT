@@ -341,25 +341,9 @@ export default function Home() {
     }
   };
 
-  const handleEditMessage = (messageId: string, newContent: string) => {
-    if (!activeConvId) return;
-    setConversations((prev) => {
-      const next = prev.map((c) => {
-        if (c.id !== activeConvId) return c;
-        const msgIdx = c.messages.findIndex((m) => m.id === messageId);
-        if (msgIdx === -1) return c;
-        const truncated = c.messages.slice(0, msgIdx);
-        return { ...c, messages: truncated };
-      });
-      setStoredConversations(next);
-      const sessionAfterUser = next.find((c) => c.id === activeConvId);
-      if (sessionAfterUser) {
-        saveChatSession(sessionAfterUser as any);
-        pushSessionToCloud(sessionAfterUser as any, user?.id);
-      }
-      return next;
-    });
-    handleSendMessage(newContent);
+  const handleEditMessage = (_messageId: string, content: string) => {
+    // Populate the clicked prompt back into the input box for user editing without premature submission
+    setInputDraft(content);
   };
 
   const handleStopGeneration = () => {

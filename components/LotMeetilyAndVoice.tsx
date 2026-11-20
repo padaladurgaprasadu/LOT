@@ -6,11 +6,13 @@ import { diarizeMeetingTranscript, formatDiarizedMinutesMarkdown } from '@/lib/m
 interface MeetilyProps {
   onVoicePrompt: (transcribedText: string) => void;
   onMeetingDocGenerated?: (markdownDoc: string) => void;
+  triggerMeetingCapture?: number;
 }
 
 export function LotMeetilyAndVoice({
   onVoicePrompt,
   onMeetingDocGenerated,
+  triggerMeetingCapture,
 }: MeetilyProps) {
   const [isDictating, setIsDictating] = useState(false);
   const [isMeetingActive, setIsMeetingActive] = useState(false);
@@ -20,6 +22,13 @@ export function LotMeetilyAndVoice({
 
   const recognitionRef = useRef<any>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // Trigger meeting capture programmatically from internal input tool
+  React.useEffect(() => {
+    if (triggerMeetingCapture && triggerMeetingCapture > 0 && !isMeetingActive) {
+      startMeetingCapture();
+    }
+  }, [triggerMeetingCapture]);
 
   // 1. WHISPER-STYLE INSTANT VOICE DICTATION
   const toggleVoiceDictation = () => {
@@ -162,67 +171,67 @@ export function LotMeetilyAndVoice({
     URL.revokeObjectURL(url);
   };
 
+  // Only render when meeting recording is active, summarizing, or minutes doc is ready
+  if (!isMeetingActive && !meetingMinutes && !isSummarizing) {
+    return null;
+  }
+
   return (
-    <div className="w-full max-w-3xl mx-auto mb-3">
-      {/* Compact Voice & Meetily Control Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-neutral-800 bg-neutral-950 px-3.5 py-2 text-xs">
-        <div className="flex items-center gap-2">
-          {/* Whisper Voice Assistant Button */}
+    <div className="w-full max-w-3xl mx-auto mb-3 animate-in fade-in duration-150">
+      {/* Active Meetily Recording HUD */}
+      {isMeetingActive && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-800/80 bg-neutral-950 px-3.5 py-2 text-xs mb-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+            <span className="font-semibold text-emerald-400">📹 Meetily: Recording Active (Meet / Zoom)</span>
+          </div>
+
           <button
             type="button"
-            onClick={toggleVoiceDictation}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition ${
-              isDictating
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'bg-neutral-900 text-neutral-200 hover:bg-neutral-800 border border-neutral-800'
-            }`}
+            onClick={stopMeetingAndGenerateDoc}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-black hover:bg-emerald-400 transition active:scale-95"
           >
-            <span>🎤</span>
-            <span>{isDictating ? 'Listening (Speak now)...' : 'Voice Input'}</span>
+            <span>⏹</span>
+            <span>Finish Meeting & Generate Doc</span>
           </button>
-
-          {/* Meetily Google Meet / Zoom Recorder Button */}
-          {!isMeetingActive ? (
-            <button
-              type="button"
-              onClick={startMeetingCapture}
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-medium text-neutral-200 hover:bg-neutral-800 transition"
-            >
-              <span>📹</span>
-              <span>Meetily: Record Meet / Zoom</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={stopMeetingAndGenerateDoc}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-black hover:bg-emerald-400 transition"
-            >
-              <span>⏹</span>
-              <span>Finish Meeting & Generate Doc</span>
-            </button>
-          )}
         </div>
+      )}
 
-        {isSummarizing && (
-          <span className="text-amber-400 animate-pulse">
-            Generating Employee Meeting Minutes...
-          </span>
-        )}
+      {isSummarizing && (
+        <div className="rounded-xl border border-amber-800/60 bg-neutral-950 px-3.5 py-2 text-xs text-amber-400 animate-pulse mb-2">
+          Generating Diarized Employee Meeting Minutes...
+        </div>
+      )}
 
-        {meetingMinutes && (
-          <button
-            type="button"
-            onClick={downloadMeetingDoc}
-            className="rounded-lg bg-white px-3 py-1.5 font-semibold text-black hover:bg-neutral-200"
-          >
-            ⬇ Download Meeting Doc (.md)
-          </button>
-        )}
-      </div>
+      {meetingMinutes && (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-neutral-950 px-3.5 py-2 text-xs mb-2">
+          <span className="text-zinc-200 font-medium">✓ Meeting Minutes & Action Items Ready</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadMeetingDoc}
+              className="rounded-lg bg-white px-3 py-1.5 font-semibold text-black hover:bg-neutral-200 transition"
+            >
+              ⬇ Download Meeting Doc (.md)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMeetingMinutes(null);
+                setMeetingTranscript('');
+              }}
+              className="px-2 py-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition text-xs"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Live Meeting Transcript Drawer */}
       {isMeetingActive && (
-        <div className="mt-2 rounded-xl border border-emerald-800/60 bg-black p-3 font-mono text-xs text-neutral-300 max-h-36 overflow-y-auto">
+        <div className="rounded-xl border border-emerald-800/60 bg-black p-3 font-mono text-xs text-neutral-300 max-h-36 overflow-y-auto">
           <div className="text-[10px] uppercase text-emerald-400 mb-1 font-sans font-semibold">
             ● Meetily Live Transcript (Google Meet / Zoom Active)
           </div>

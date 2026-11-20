@@ -227,16 +227,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {/* Hover Action Bar: Copy & Edit */}
         <div className="flex items-center space-x-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pr-1">
           <button
-            onClick={() => handleCopy(message.content)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCopy(message.content);
+            }}
             className="p-1 text-white hover:text-zinc-300 rounded-md hover:bg-zinc-800/40 transition-all duration-150 active:scale-95"
             title="Copy prompt"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white" />}
           </button>
           <button
-            onClick={() => onEditMessage && onEditMessage(message.id, message.content)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onEditMessage) {
+                onEditMessage(message.id, message.content);
+              }
+            }}
             className="p-1 text-white hover:text-zinc-300 rounded-md hover:bg-zinc-800/40 transition-all duration-150 active:scale-95"
-            title="Edit prompt into input box"
+            title="Edit prompt in input box"
           >
             <Pencil className="w-3.5 h-3.5 text-white" />
           </button>
