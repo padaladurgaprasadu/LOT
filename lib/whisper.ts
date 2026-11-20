@@ -20,24 +20,30 @@ export async function transcribeAudioWithWhisper(
   fileName = "audio.webm",
   mimeType = "audio/webm"
 ): Promise<WhisperTranscriptionResult> {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.WHISPER_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  const openAiKey = process.env.OPENAI_API_KEY || process.env.WHISPER_API_KEY;
+  const apiKey = groqKey || openAiKey;
 
   if (!apiKey) {
-    // Returning a canned sentence here made a misconfigured server look like a working
-    // transcriber and silently put text the user never said into their message box.
     throw new Error(
-      "Speech-to-text is not configured on this server. Set OPENAI_API_KEY (or WHISPER_API_KEY) to enable voice transcription."
+      "Speech-to-text is not configured on this server. Set GROQ_API_KEY, OPENAI_API_KEY, or WHISPER_API_KEY to enable voice transcription."
     );
   }
+
+  const endpoint = groqKey
+    ? "https://api.groq.com/openai/v1/audio/transcriptions"
+    : "https://api.openai.com/v1/audio/transcriptions";
+  const modelName = groqKey ? "whisper-large-v3-turbo" : "whisper-1";
 
   try {
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
     formData.append("file", blob, fileName);
-    formData.append("model", "whisper-1");
+    formData.append("model", modelName);
     formData.append("response_format", "verbose_json");
+    formData.append("language", "en");
 
-    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,

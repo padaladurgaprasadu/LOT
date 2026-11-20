@@ -65,6 +65,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef<boolean>(false);
   const baseInputRef = useRef<string>("");
+  const lastFinalTranscriptRef = useRef<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -123,14 +124,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // START LISTENING
     baseInputRef.current = input;
+    lastFinalTranscriptRef.current = "";
 
-    // 1. Web Speech API (Continuous 100% full phrase streaming)
+    // 1. Web Speech API (Deduplicated against Android Chrome double-emission bug)
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       try {
         const recognition = new SpeechRecognition();
         recognitionRef.current = recognition;
-        recognition.continuous = true;
+        const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad/i.test(navigator.userAgent);
+        recognition.continuous = !isMobile;
         recognition.interimResults = true;
         recognition.lang = "en-US";
 
@@ -140,12 +143,32 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let liveTranscript = "";
-          for (let i = 0; i < event.results.length; i++) {
-            liveTranscript += event.results[i][0].transcript;
+          let interimChunk = "";
+
+          // Start strictly at event.resultIndex, NEVER 0 (prevents "hello hello" accumulation)
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const res = event.results[i];
+            const transcript = res[0]?.transcript?.trim() || "";
+            const confidence = res[0]?.confidence;
+
+            // Filter out Android Chrome 0-confidence ghost duplicates
+            if (res.isFinal && transcript && confidence !== 0) {
+              if (transcript !== lastFinalTranscriptRef.current) {
+                lastFinalTranscriptRef.current = transcript;
+                const base = baseInputRef.current;
+                const updated = base ? `${base.trim()} ${transcript}` : transcript;
+                baseInputRef.current = updated;
+                setInput(updated);
+              }
+            } else if (!res.isFinal && transcript) {
+              interimChunk += " " + transcript;
+            }
           }
-          const base = baseInputRef.current;
-          setInput(base ? `${base} ${liveTranscript}` : liveTranscript);
+
+          if (interimChunk) {
+            const base = baseInputRef.current;
+            setInput(base ? `${base.trim()} ${interimChunk.trim()}` : interimChunk.trim());
+          }
         };
 
         recognition.onerror = (err: any) => {
@@ -157,10 +180,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         };
 
         recognition.onend = () => {
-          if (isListeningRef.current) {
+          lastFinalTranscriptRef.current = "";
+          if (isListeningRef.current && !isMobile) {
             try {
               recognition.start();
             } catch {}
+          } else {
+            isListeningRef.current = false;
+            setIsListening(false);
           }
         };
 
@@ -171,24 +198,36 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       }
     }
 
-    // 2. Whisper Fallback via MediaRecorder
+    // 2. Whisper Fallback via MediaRecorder (Cross-platform webm / mp4 support)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const mimeTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ];
+      const selectedMime = mimeTypes.find((t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)) || "";
+      const recorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const finalMime = recorder.mimeType || "audio/webm";
+        const ext = finalMime.includes("mp4") ? "mp4" : "webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalMime });
+
         if (audioBlob.size > 1000) {
           setIsTranscribing(true);
           const formData = new FormData();
-          formData.append("audio", audioBlob, "recording.webm");
+          formData.append("audio", audioBlob, `recording.${ext}`);
           try {
             const res = await fetch("/api/whisper", {
               method: "POST",
@@ -197,7 +236,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (res.ok) {
               const data = await res.json();
               if (data.text) {
-                setInput((prev) => (prev ? `${prev} ${data.text}` : data.text));
+                setInput((prev) => (prev ? `${prev.trim()} ${data.text.trim()}` : data.text.trim()));
               }
             }
           } catch (e) {

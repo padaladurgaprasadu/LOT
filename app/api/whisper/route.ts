@@ -8,12 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get("lot_session_token")?.value;
     const session = token ? verifyJwt(token) : null;
-    if (!session) {
-      return NextResponse.json(
-        { error: "Authentication required for voice transcription." },
-        { status: 401 }
-      );
-    }
+    // Permit anonymous guest sessions to transcribe voice inputs seamlessly
 
     const contentType = req.headers.get("content-type") || "";
 
