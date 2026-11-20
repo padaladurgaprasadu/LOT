@@ -169,7 +169,7 @@ export const DEFAULT_EDITOR_CASCADE: ModelCandidate[] = [
   },
   {
     provider: "nvidia",
-    model: "qwen/qwen2.5-coder-32b-instruct",
+    model: "qwen/qwen-2.5-coder-32b-instruct",
     role: "editor",
     priority: 3,
     baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",

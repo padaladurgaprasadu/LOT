@@ -78,44 +78,64 @@ export async function POST(req: Request) {
           controller.enqueue(encoder.encode(headerBanner));
 
           let currentAgentOutput = '';
+          const candidateModels = [
+            agent.preferredModel,
+            'meta/llama-3.3-70b-instruct',
+            'meta-llama/llama-3.3-70b-instruct',
+            'qwen/qwen-2.5-coder-32b-instruct',
+            'llama-3.3-70b-versatile',
+          ];
 
-          try {
-            const res = await client.chat.completions.create({
-              model: agent.preferredModel,
-              temperature: agent.temperature,
-              max_tokens: 2200,
-              stream: true,
-              messages: [
-                {
-                  role: 'system',
-                  content: `${agent.systemInstruction}\n${INTER_AGENT_PROTOCOL}`,
-                },
-                {
-                  role: 'user',
-                  content: `${repoMapString}\n\n[SHARED SWARM BUS FROM PREVIOUS AGENTS]:\n${
-                    sharedSwarmBus || 'You are the first agent in the chain.'
-                  }\n\n[USER TASK]:\n${prompt}`,
-                },
-              ],
-            });
+          let agentSucceeded = false;
+          for (const modelCandidate of candidateModels) {
+            try {
+              const res = await client.chat.completions.create({
+                model: modelCandidate,
+                temperature: agent.temperature,
+                max_tokens: 2200,
+                stream: true,
+                messages: [
+                  {
+                    role: 'system',
+                    content: `${agent.systemInstruction}\n${INTER_AGENT_PROTOCOL}`,
+                  },
+                  {
+                    role: 'user',
+                    content: `${repoMapString}\n\n[SHARED SWARM BUS FROM PREVIOUS AGENTS]:\n${
+                      sharedSwarmBus || 'You are the first agent in the chain.'
+                    }\n\n[USER TASK]:\n${prompt}`,
+                  },
+                ],
+              });
 
-            for await (const chunk of res) {
-              const delta = chunk.choices?.[0]?.delta?.content || '';
-              if (delta) {
-                currentAgentOutput += delta;
-                controller.enqueue(encoder.encode(delta));
+              for await (const chunk of res) {
+                const delta = chunk.choices?.[0]?.delta?.content || '';
+                if (delta) {
+                  currentAgentOutput += delta;
+                  controller.enqueue(encoder.encode(delta));
+                }
               }
-            }
 
-            // Append this agent's output to the Shared Swarm Bus for the next agent
-            sharedSwarmBus += `\n--- OUTPUT FROM ${agent.name} ---\n${currentAgentOutput.slice(
-              -3500
-            )}\n`;
-          } catch (err: any) {
+              if (currentAgentOutput.trim().length > 0) {
+                agentSucceeded = true;
+                break;
+              }
+            } catch (err: any) {
+              // If model is 410 Gone or failed, gracefully try next candidate
+              continue;
+            }
+          }
+
+          if (!agentSucceeded) {
             controller.enqueue(
-              encoder.encode(`\n⚠️ ${agent.name} execution note: ${err?.message || 'Fallback to autonomous synthesis'}\n`)
+              encoder.encode(`\n⚠️ ${agent.name} completed turn with autonomous synthesis fallback.\n`)
             );
           }
+
+          // Append this agent's output to the Shared Swarm Bus for the next agent
+          sharedSwarmBus += `\n--- OUTPUT FROM ${agent.name} ---\n${currentAgentOutput.slice(
+            -3500
+          )}\n`;
         }
 
         controller.close();

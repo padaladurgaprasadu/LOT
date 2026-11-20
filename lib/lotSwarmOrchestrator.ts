@@ -29,7 +29,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'lot_code_lead',
     name: 'LOT Code Architect',
     badge: '⚡ LOT Code',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.1,
     domainKeywords: /\b(refactor|repo|diff|patch|architecture|cline|cursor|codex)\b/i,
     systemInstruction:
@@ -39,7 +39,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'frontend_dev',
     name: 'Frontend Developer Agent',
     badge: '🎨 Frontend',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.15,
     domainKeywords: /\b(react|nextjs|tailwind|ui|ux|css|component|animation|responsive|shadcn|frontend)\b/i,
     systemInstruction:
@@ -49,7 +49,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'backend_dev',
     name: 'Backend Developer Agent',
     badge: '⚙️ Backend',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.1,
     domainKeywords: /\b(api|fastapi|nodejs|express|postgres|supabase|prisma|redis|jwt|webhook|microservice|backend)\b/i,
     systemInstruction:
@@ -59,7 +59,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'web_dev',
     name: 'Web Developer Agent',
     badge: '🌐 Web Dev',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.15,
     domainKeywords: /\b(html|landing page|website|seo|dom|vanilla js|portfolio|vite|web app)\b/i,
     systemInstruction:
@@ -69,7 +69,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'fullstack_dev',
     name: 'Full Stack Developer Agent',
     badge: '🚀 Full Stack',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.1,
     domainKeywords: /\b(full stack|saas|end to end|crud|auth flow|deployment|stripe|razorpay)\b/i,
     systemInstruction:
@@ -99,7 +99,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'data_analyst',
     name: 'Data Analyst & BI Developer',
     badge: '📊 Data Analyst',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.15,
     domainKeywords: /\b(pandas|sql query|kpi|dashboard|matplotlib|plotly|csv|excel|eda|cohort|revenue analysis)\b/i,
     systemInstruction:
@@ -109,7 +109,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'vlsi_architect',
     name: 'VLSI & Silicon Architect Agent',
     badge: '🔌 VLSI / RTL',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.1,
     domainKeywords: /\b(verilog|systemverilog|rtl|fpga|asic|testbench|gtkwave|axi|fsm|timing|synthesis|alu|sram|vlsi)\b/i,
     systemInstruction:
@@ -119,7 +119,7 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     id: 'embedded_ai',
     name: 'Embedded AI & Firmware Agent',
     badge: '🤖 Embedded AI',
-    preferredModel: 'qwen/qwen2.5-coder-32b-instruct',
+    preferredModel: 'qwen/qwen-2.5-coder-32b-instruct',
     temperature: 0.1,
     domainKeywords: /\b(esp32|stm32|arduino|rtos|tflite micro|edge ai|i2c|spi|uart|ads1299|eeg|sensor|firmware|pcb|c\+\+)\b/i,
     systemInstruction:
