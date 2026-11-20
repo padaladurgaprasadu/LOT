@@ -178,3 +178,70 @@ export async function pushFileToGitHub(params: {
     throw new Error(err.message || `Failed to push ${filePath}`);
   }
 }
+
+// 5. Batch Push entire workspace or modified files to GitHub
+export async function pushWorkspaceToGitHub(
+  repoFullName: string,
+  files: Record<string, { path?: string; content?: string; language?: string }>,
+  commitMessage: string,
+  branch?: string,
+  token?: string
+): Promise<{ success: boolean; commitUrl?: string; error?: string; filesCommitted?: number }> {
+  if (!repoFullName || typeof repoFullName !== 'string' || !repoFullName.includes('/')) {
+    return {
+      success: false,
+      error: 'Invalid repository name. Format must be owner/repo.',
+    };
+  }
+
+  if (!token || typeof token !== 'string' || !token.trim()) {
+    return {
+      success: false,
+      error: 'GitHub Personal Access Token is required to push changes.',
+    };
+  }
+
+  const fileEntries = Object.entries(files || {}).filter(
+    ([_, fileObj]) => fileObj && typeof fileObj.content === 'string'
+  );
+
+  if (fileEntries.length === 0) {
+    return {
+      success: false,
+      error: 'No files to commit in workspace.',
+    };
+  }
+
+  const targetBranch = branch?.trim() || 'main';
+  const msg = commitMessage?.trim() || 'Update workspace via LOT Super-Agent';
+  let filesCommitted = 0;
+
+  try {
+    for (const [pathKey, fileObj] of fileEntries) {
+      const filePath = fileObj.path || pathKey;
+      const content = fileObj.content ?? '';
+      await pushFileToGitHub({
+        repoFullName: repoFullName.trim(),
+        branch: targetBranch,
+        filePath,
+        content,
+        commitMessage: `${msg} (${filePath})`,
+        githubToken: token.trim(),
+      });
+      filesCommitted++;
+    }
+
+    return {
+      success: true,
+      commitUrl: `https://github.com/${repoFullName.trim()}/tree/${targetBranch}`,
+      filesCommitted,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Failed to push workspace to GitHub',
+      filesCommitted,
+    };
+  }
+}
+

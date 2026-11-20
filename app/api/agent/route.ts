@@ -1,103 +1,66 @@
 // app/api/agent/route.ts
-import OpenAI from 'openai';
-import {
-  LOT_SUPER_AGENT_PROMPT,
-  buildWorkspaceContext,
-} from '@/lib/lotSuperAgent';
+/**
+ * Autonomous Coding Agent API Route (Requirement R3)
+ * Upgraded with Architect-Editor Dual-Model Orchestrator:
+ * - Architect Phase: Ingests AST Repo Map (~1,500 tokens) & emits structured <lotPlan>
+ * - Editor Phase: Ingests plan + file contents & streams surgical <lotDiff> SEARCH/REPLACE blocks
+ * - Multi-provider failover: DeepSeek -> NVIDIA NIM -> OpenRouter -> Groq -> Sovereign Fallback
+ * - Maintains 100% backward compatibility with app/page.tsx streaming SSE event loop
+ */
+
+import { globalDualModelOrchestrator } from '@/lib/agent/dualModelOrchestrator';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const apiKey =
-  process.env.NVIDIA_API_KEY ||
-  process.env.LOT_BACKEND_KEY ||
-  '';
-
-const client = apiKey
-  ? new OpenAI({
-      baseURL: 'https://integrate.api.nvidia.com/v1',
-      apiKey,
-    })
-  : null;
-
 export async function POST(req: Request) {
   try {
-    const { messages = [], files = {} } = await req.json();
+    const { messages = [], files = {} } = await req.json().catch(() => ({ messages: [], files: {} }));
     const lastUserMsg = messages[messages.length - 1]?.content || '';
 
-    const workspaceContext = buildWorkspaceContext(lastUserMsg, files);
-    const fullSystemPrompt = `${LOT_SUPER_AGENT_PROMPT}\n\n${workspaceContext}`;
-
-    const recentMessages = messages.slice(-6).map((m: any) => ({
-      role: m.role,
-      content: String(m.content || ''),
-    }));
+    // Normalize incoming workspace files to Record<string, { path: string; content: string }>
+    const workspaceFiles: Record<string, { path: string; content: string }> = {};
+    if (files && typeof files === 'object') {
+      for (const [key, value] of Object.entries(files)) {
+        if (typeof value === 'string') {
+          workspaceFiles[key] = { path: key, content: value };
+        } else if (value && typeof value === 'object') {
+          const path = (value as any).path || key;
+          const content = (value as any).content ?? (value as any).code ?? '';
+          workspaceFiles[path] = { path, content: String(content) };
+        }
+      }
+    }
 
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
       async start(controller) {
-        if (!client) {
+        try {
+          await globalDualModelOrchestrator.streamDualModelExecution({
+            prompt: lastUserMsg,
+            workspaceFiles,
+            onDelta: (delta: string) => {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`)
+              );
+            },
+            signal: req.signal,
+          });
+
+          // Signal completion to app/page.tsx pacer
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        } catch (execErr: any) {
+          const errMsg = execErr?.message || 'Agent pipeline encountered an error';
           controller.enqueue(
-            encoder.encode('⚠️ NVIDIA_API_KEY is not configured in environment variables.')
+            encoder.encode(
+              `data: ${JSON.stringify({ delta: `\n\n⚠️ ${errMsg}\n` })}\n\n`
+            )
           );
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        } finally {
           controller.close();
-          return;
         }
-
-        let started = false;
-        const models = [
-          'qwen/qwen2.5-coder-32b-instruct', // Primary: Beats GPT-4o on coding benchmarks
-          'meta/llama-3.3-70b-instruct',     // Instant High-Speed Fallback
-          'meta/llama-3.1-8b-instruct',      // Ultra-fast Emergency Fallback
-        ];
-
-        for (const model of models) {
-          const abort = new AbortController();
-          const timer = setTimeout(() => {
-            if (!started) abort.abort();
-          }, 3800);
-
-          try {
-            const res = await client.chat.completions.create(
-              {
-                model,
-                messages: [
-                  { role: 'system', content: fullSystemPrompt },
-                  ...recentMessages,
-                ],
-                temperature: 0.1,
-                max_tokens: 4096,
-                stream: true,
-              },
-              { signal: abort.signal }
-            );
-
-            for await (const chunk of res) {
-              const delta = chunk.choices?.[0]?.delta?.content || '';
-              if (delta) {
-                started = true;
-                clearTimeout(timer);
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`));
-              }
-            }
-            clearTimeout(timer);
-            if (started) {
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-              break;
-            }
-          } catch {
-            clearTimeout(timer);
-            if (started) break;
-          }
-        }
-
-        if (!started) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ delta: '⚠️ Model response timed out or could not be established. Please retry.' })}\n\n`)
-          );
-        }
-        controller.close();
       },
     });
 
@@ -109,6 +72,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (err: any) {
-    return new Response(`Agent Error: ${err?.message || 'Unknown error'}`, { status: 200 });
+    return new Response(`Agent Error: ${err?.message || 'Unknown error'}`, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   }
 }

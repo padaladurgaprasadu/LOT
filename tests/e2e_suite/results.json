@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-11-18T06:18:10.613Z",
+  "totalTests": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "durationMs": 94,
+  "results": [
+    {
+      "id": "BC-F19-05",
+      "tier": 2,
+      "feature": "F19: GitHub & Export",
+      "description": "Tier 2: Rollback History Bounds & Workspace Limits > GitHub API rate limit exhaustion (HTTP 403) handling",
+      "status": "PASSED",
+      "durationMs": 94
+    }
+  ]
+}
