@@ -46,6 +46,7 @@ import {
   IndustryFocus,
 } from "../lib/types";
 import { LotOsMode, LOT_OS_MODES } from "@/lib/lot-os/types";
+import { planAgentSwarmPipeline } from "@/lib/lotSwarmOrchestrator";
 import { DEFAULT_MODEL_ID, LOT_SYSTEM_PROMPT } from "../lib/nvidia";
 import { migrateGuestConversationsToUser, saveInputDraft, getInputDraft, clearInputDraft } from "../lib/session";
 
@@ -520,9 +521,20 @@ export default function Home() {
         ]);
       }
 
-      const isSwarmQuery = content.includes("[SWARM:") || /\b(swarm|multi-agent)\b/i.test(content) && content.includes("[HANDOFF");
-      const endpoint = isSwarmQuery ? "/api/swarm" : isCodingAgentQuery ? "/api/agent" : "/api/chat";
-      const requestBody = isSwarmQuery
+      // Dynamic intent-driven Swarm Collaboration detection based on prompt intent:
+      const plannedAgents = planAgentSwarmPipeline(content);
+      const isExplicitSwarmRequested =
+        /\b(swarm|multi-?agent|collaborate|collaborative agents|pipeline handoff)\b/i.test(content) ||
+        content.includes("[SWARM:");
+      const isMultiAgentIntent =
+        isExplicitSwarmRequested ||
+        (plannedAgents.length > 1 &&
+          /\b(full\s*stack|saas|end-to-end|end to end|both frontend and backend|hardware and firmware|sensor and edge|model and embed|audit and fix)\b/i.test(
+            content
+          ));
+
+      const endpoint = isMultiAgentIntent ? "/api/swarm" : isCodingAgentQuery ? "/api/agent" : "/api/chat";
+      const requestBody = isMultiAgentIntent
         ? {
             prompt: content,
             files: agentFiles,

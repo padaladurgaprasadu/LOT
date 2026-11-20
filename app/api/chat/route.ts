@@ -43,6 +43,7 @@ import {
 } from "@/lib/agents/lotCodeEngine";
 import OpenAI from "openai";
 import { buildInfiniteContext } from "@/lib/contextManager";
+import { planAgentSwarmPipeline, LOT_DOMAIN_AGENTS } from "@/lib/lotSwarmOrchestrator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -225,6 +226,20 @@ Follow these strict rules in every response:
       ? `${masterSystemPrompt}\n\n[USER CUSTOM INSTRUCTION]:\n${body.customPrompt}`
       : masterSystemPrompt;
 
+    // Intent-Driven Domain Agent Specialization:
+    let domainDirective = "";
+    try {
+      const detectedPipeline = planAgentSwarmPipeline(query);
+      if (detectedPipeline.length > 0 && detectedPipeline[0] !== "lot_code_lead") {
+        const primaryAgent = LOT_DOMAIN_AGENTS[detectedPipeline[0]];
+        if (primaryAgent) {
+          domainDirective = `\n\n[ACTIVE DOMAIN SPECIALIST: ${primaryAgent.name} (${primaryAgent.badge})]:\n${primaryAgent.systemInstruction}`;
+        }
+      }
+    } catch {
+      // Gracefully continue with base prompt if parsing fails
+    }
+
     let groundingSystemContent = "";
     if (searchResults && searchResults.length > 0) {
       const groundingSnippet = searchResults
@@ -237,7 +252,7 @@ Follow these strict rules in every response:
       groundingSystemContent = `\n\n[VERIFIED REAL-TIME GROUNDING - USE ONLY THESE EXACT URLS IF LINKS ARE NEEDED]:\n${groundingSnippet}\n\nStrictly adhere to the verified URLs above. NEVER invent or hallucinate URLs.`;
     }
 
-    const fullSystemPrompt = baseSystemPrompt + groundingSystemContent;
+    const fullSystemPrompt = baseSystemPrompt + domainDirective + groundingSystemContent;
 
     const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
     const openaiClient = apiKey

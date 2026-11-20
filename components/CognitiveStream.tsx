@@ -10,7 +10,6 @@ import { ThinkingBlock } from "@/components/chat/ThinkingBlock";
 import { WelcomeHero } from "@/components/WelcomeHero";
 import { ChatInput } from "@/components/ChatInput";
 import { LotMeetilyAndVoice } from "@/components/LotMeetilyAndVoice";
-import { AgentId, LOT_DOMAIN_AGENTS } from "@/lib/lotSwarmOrchestrator";
 import {
   Sparkles,
   ExternalLink,
@@ -161,7 +160,6 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
 }) => {
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [selectedSwarmAgents, setSelectedSwarmAgents] = useState<AgentId[]>([]);
   const [triggerMeeting, setTriggerMeeting] = useState<number>(0);
 
   const handleEditMessageInternal = (id: string, text: string) => {
@@ -173,15 +171,8 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
     }, 50);
   };
 
-  const handleSendWithSwarm = (text: string, attachment?: Attachment, focus?: IndustryFocus) => {
-    let finalMsg = text;
-    if (selectedSwarmAgents.length > 0) {
-      const agentNames = selectedSwarmAgents
-        .map((id) => LOT_DOMAIN_AGENTS[id]?.name || id)
-        .join(", ");
-      finalMsg = `[SWARM: ${agentNames}]\n${text}`;
-    }
-    onSendMessage(finalMsg, attachment, focus);
+  const handleSendPrompt = (text: string, attachment?: Attachment, focus?: IndustryFocus) => {
+    onSendMessage(text, attachment, focus);
   };
 
   // Auto-scroll on new messages or during streaming
@@ -300,7 +291,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
         <LotMeetilyAndVoice
           triggerMeetingCapture={triggerMeeting}
           onVoicePrompt={(voiceText) => {
-            handleSendWithSwarm(voiceText);
+            handleSendPrompt(voiceText);
           }}
           onMeetingDocGenerated={(doc) => {
             console.log("Meeting minutes generated successfully:", doc.length);
@@ -308,7 +299,7 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
         />
 
         <ChatInput
-          onSendMessage={handleSendWithSwarm}
+          onSendMessage={handleSendPrompt}
           isLoading={isLoading}
           onStopGeneration={onStopGeneration}
           onOpenScheduleTasks={onOpenScheduleTasks}
@@ -319,13 +310,6 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
           onSearchFocusChange={onSearchFocusChange}
           activeMode={mode}
           onSelectMode={(m) => onSelectMode(m as LotOsMode)}
-          selectedSwarmAgents={selectedSwarmAgents}
-          onToggleSwarmAgent={(id) => {
-            setSelectedSwarmAgents((prev) =>
-              prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-            );
-          }}
-          onClearSwarmAgents={() => setSelectedSwarmAgents([])}
           onStartMeetily={() => setTriggerMeeting((prev) => prev + 1)}
         />
       </div>

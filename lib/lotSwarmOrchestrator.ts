@@ -141,13 +141,13 @@ export const LOT_DOMAIN_AGENTS: Record<AgentId, DomainAgentSpec> = {
     badge: '🛡️ Security',
     preferredModel: 'meta/llama-3.3-70b-instruct',
     temperature: 0.1,
-    domainKeywords: /\b(security|vulnerability|audit|owasp|sqli|xss|jwt|auth|leak|sanitize|safe)\b/i,
+    domainKeywords: /\b(security|vulnerability|audit|owasp|sqli|xss|jwt|auth|leak|sanitize|safe|penetration|exploit|cve)\b/i,
     systemInstruction:
       'You are the Red-Team Security Gatekeeper Agent. Audit code for OWASP Top 10 vulnerabilities, leaked secrets, SQL injection, and memory leaks. Emit a structured [SECURITY VERDICT: PASS/FAIL] with required remediations.',
   },
 };
 
-// Auto-detect which ensemble of agents should collaborate on a user request
+// Auto-detect which ensemble of agents should collaborate on a user request based on input intent
 export function planAgentSwarmPipeline(
   userPrompt: string,
   explicitAgents?: AgentId[]
@@ -163,15 +163,33 @@ export function planAgentSwarmPipeline(
     }
   }
 
-  // Automatic Multi-Agent Collaboration Rules:
-  // If user asks for a Full-Stack app, automatically pair Backend -> Frontend
-  if (matched.includes('fullstack_dev')) {
+  // Automatic Multi-Agent Collaboration Rules based on user intent:
+  // 1. If user asks for a Full-Stack app / end-to-end, automatically pair Backend -> Frontend -> Fullstack
+  if (
+    matched.includes('fullstack_dev') ||
+    (matched.includes('backend_dev') && matched.includes('frontend_dev'))
+  ) {
     return ['backend_dev', 'frontend_dev', 'fullstack_dev'];
   }
 
-  // If user asks for Edge/Embedded AI + Hardware, pair ML -> Embedded -> VLSI
+  // 2. If user asks for Edge/Embedded AI + Hardware/ML, pair ML -> Embedded
   if (matched.includes('embedded_ai') && matched.includes('ml_engineer')) {
     return ['ml_engineer', 'embedded_ai'];
+  }
+
+  // 3. If user asks for VLSI + Embedded Firmware
+  if (matched.includes('vlsi_architect') && matched.includes('embedded_ai')) {
+    return ['vlsi_architect', 'embedded_ai'];
+  }
+
+  // 4. If user asks for Data Science + Analysis
+  if (matched.includes('data_scientist') && matched.includes('data_analyst')) {
+    return ['data_scientist', 'data_analyst'];
+  }
+
+  // 5. If user asks for Security Audit along with code building
+  if (matched.includes('security_gatekeeper') && (matched.includes('backend_dev') || matched.includes('fullstack_dev'))) {
+    return ['backend_dev', 'security_gatekeeper'];
   }
 
   if (matched.length === 0) {
@@ -180,4 +198,11 @@ export function planAgentSwarmPipeline(
 
   // Cap automatic sequential swarm at 3 collaborating agents per turn for fast response
   return matched.slice(0, 3);
+}
+
+// Helper to detect primary intent domain agent
+export function detectIntentDomainAgent(userPrompt: string): DomainAgentSpec {
+  const pipeline = planAgentSwarmPipeline(userPrompt);
+  const primaryId = pipeline[0] || 'lot_code_lead';
+  return LOT_DOMAIN_AGENTS[primaryId] || LOT_DOMAIN_AGENTS.lot_code_lead;
 }

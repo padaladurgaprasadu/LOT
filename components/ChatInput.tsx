@@ -18,17 +18,14 @@ import {
   Cpu,
   Newspaper,
   Check,
-  Bot,
   GraduationCap,
   Terminal,
   MessageSquare,
-  Users,
   Video,
   Radio,
 } from "lucide-react";
 import { Attachment, IndustryFocus } from "@/lib/types";
 import { LotOsMode } from "@/lib/lot-os/types";
-import { LOT_DOMAIN_AGENTS, AgentId } from "@/lib/lotSwarmOrchestrator";
 
 export interface ChatInputProps {
   onSendMessage: (message: string, attachment?: Attachment, searchFocus?: IndustryFocus) => void;
@@ -42,9 +39,6 @@ export interface ChatInputProps {
   onSearchFocusChange?: (focus: IndustryFocus) => void;
   activeMode?: string;
   onSelectMode?: (mode: string) => void;
-  selectedSwarmAgents?: AgentId[];
-  onToggleSwarmAgent?: (id: AgentId) => void;
-  onClearSwarmAgents?: () => void;
   onStartMeetily?: () => void;
 }
 
@@ -60,9 +54,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSearchFocusChange,
   activeMode = "chat",
   onSelectMode,
-  selectedSwarmAgents = [],
-  onToggleSwarmAgent,
-  onClearSwarmAgents,
   onStartMeetily,
 }) => {
   const [input, setInput] = useState("");
@@ -71,11 +62,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
-  const [swarmMenuOpen, setSwarmMenuOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
-  const swarmMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef<boolean>(false);
   const baseInputRef = useRef<string>("");
@@ -110,9 +99,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     function handleClickOutside(event: MouseEvent) {
       if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
         setPlusMenuOpen(false);
-      }
-      if (swarmMenuRef.current && !swarmMenuRef.current.contains(event.target as Node)) {
-        setSwarmMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -385,43 +371,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
       {/* Clean Solid Matte Input Container */}
       <div className="relative flex flex-col bg-[#111114] border border-[#27272a] focus-within:border-zinc-500 rounded-2xl px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-xl transition-colors duration-150">
-        {/* Row 1 (Internal): Active Swarm Domain Agent Pills */}
-        {selectedSwarmAgents && selectedSwarmAgents.length > 0 && (
-          <div className="w-full flex items-center gap-1.5 flex-wrap px-1 pb-1.5 border-b border-zinc-800/60 mb-1.5 animate-in fade-in">
-            <span className="text-[10px] uppercase font-semibold text-zinc-500 tracking-wider">
-              Swarm:
-            </span>
-            {selectedSwarmAgents.map((id) => {
-              const agent = LOT_DOMAIN_AGENTS[id];
-              if (!agent) return null;
-              return (
-                <span
-                  key={id}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-200 text-xs border border-zinc-700 animate-in fade-in"
-                >
-                  <span>{agent.badge}</span>
-                  <button
-                    type="button"
-                    onClick={() => onToggleSwarmAgent?.(id)}
-                    className="text-zinc-400 hover:text-white ml-0.5"
-                    title="Remove agent"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              );
-            })}
-            <button
-              type="button"
-              onClick={onClearSwarmAgents}
-              className="text-[10px] text-zinc-500 hover:text-zinc-300 ml-1 underline cursor-pointer"
-            >
-              Clear
-            </button>
-          </div>
-        )}
-
-        {/* Row 2 (Internal): Live Audio Recording Waveform Visualizer */}
+        {/* Row 1 (Internal): Live Audio Recording Waveform Visualizer */}
         {isListening && (
           <div className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-red-950/40 border border-red-500/30 rounded-xl mb-1.5 animate-in fade-in">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
@@ -654,89 +604,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     <span>Meetily: Record Meet / Zoom</span>
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlusMenuOpen(false);
-                    setSwarmMenuOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] text-left transition-colors"
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <Users className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Swarm Domain Agents</span>
-                  </div>
-                  {selectedSwarmAgents && selectedSwarmAgents.length > 0 && (
-                    <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-medium">
-                      {selectedSwarmAgents.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Swarm Domain Agents Selector Button */}
-        <div className="relative mb-0.5 shrink-0 ml-0.5" ref={swarmMenuRef}>
-          <button
-            type="button"
-            onClick={() => setSwarmMenuOpen(!swarmMenuOpen)}
-            className={`p-1.5 rounded-lg transition-colors active:scale-95 flex items-center gap-1 ${
-              selectedSwarmAgents && selectedSwarmAgents.length > 0
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-medium"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
-            }`}
-            title="Swarm Domain Agents"
-          >
-            <Bot className="w-4 h-4" />
-            {selectedSwarmAgents && selectedSwarmAgents.length > 0 && (
-              <span className="text-[10px] font-bold bg-blue-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">
-                {selectedSwarmAgents.length}
-              </span>
-            )}
-          </button>
-
-          {/* Swarm Menu Popover */}
-          {swarmMenuOpen && (
-            <div className="absolute bottom-12 left-0 w-64 bg-[#141418] border border-[#27272a] rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in duration-100 max-h-72 overflow-y-auto custom-scrollbar">
-              <div className="flex items-center justify-between px-2 pb-1.5 border-b border-zinc-800 mb-1">
-                <span className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">
-                  Swarm Agents (12)
-                </span>
-                {selectedSwarmAgents && selectedSwarmAgents.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={onClearSwarmAgents}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-300 underline"
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-1">
-                {Object.values(LOT_DOMAIN_AGENTS).map((agent) => {
-                  const active = selectedSwarmAgents?.includes(agent.id);
-                  return (
-                    <button
-                      key={agent.id}
-                      type="button"
-                      onClick={() => onToggleSwarmAgent?.(agent.id)}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition ${
-                        active
-                          ? "bg-white text-black font-semibold shadow-sm"
-                          : "text-zinc-300 hover:text-white hover:bg-[#1f1f26]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span>{agent.badge}</span>
-                        <span className="truncate text-xs opacity-90">{agent.name}</span>
-                      </div>
-                      {active && <Check className="w-3.5 h-3.5 text-black shrink-0" />}
-                    </button>
-                  );
-                })}
               </div>
             </div>
           )}
