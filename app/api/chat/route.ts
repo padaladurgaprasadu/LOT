@@ -44,6 +44,8 @@ import {
 import OpenAI from "openai";
 import { buildInfiniteContext } from "@/lib/contextManager";
 import { planAgentSwarmPipeline, LOT_DOMAIN_AGENTS } from "@/lib/lotSwarmOrchestrator";
+import { executeInstantWebSearch, LiveSource } from "@/lib/liveWebSearch";
+import { rewriteSearchQuery } from "@/lib/queryRewriter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +57,8 @@ export interface ChatApiRequest {
   modelOverride?: string;
   mode?: string;
   enableGrounding?: boolean;
+  forceWebSearch?: boolean;
+  deepResearch?: boolean;
   stream?: boolean;
   customPrompt?: string;
   temperature?: number;
@@ -69,6 +73,8 @@ export interface ChatApiResponse {
   modelUsed: string;
   provider: string;
   searchResults?: WebSearchResult[];
+  sources?: LiveSource[];
+  queries?: string[];
   summary?: string;
   artifacts?: {
     reactApp?: ReactAppArtifact | null;
@@ -182,10 +188,59 @@ export async function POST(req: Request): Promise<Response> {
 
     const intentClassification: IntentClassification = classifyQueryIntent(query, mode);
 
-    // 4. Verified Live Web Grounding
+    const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
+    const openaiClient = apiKey
+      ? new OpenAI({
+          baseURL: "https://integrate.api.nvidia.com/v1",
+          apiKey: apiKey.trim(),
+        })
+      : null;
+
+    // Current Indian Standard Time (IST) timestamp
+    const currentDateTime = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "full",
+      timeStyle: "short",
+    });
+
+    // 4. Autonomous Conversational Query Rewriter & Parallel Live Web Search
+    let liveSources: LiveSource[] = [];
+    let rewrittenQueries: string[] = [];
+    const forceWebSearch = body.forceWebSearch === true || body.enableGrounding === true;
+
+    if (query) {
+      try {
+        const rewritePlan = await rewriteSearchQuery({
+          client: openaiClient,
+          messages: rawMessages,
+          forceWebSearch,
+        });
+
+        if (rewritePlan.needsSearch && rewritePlan.queries.length > 0) {
+          rewrittenQueries = rewritePlan.queries;
+          const searchOutputs = await Promise.all(
+            rewritePlan.queries.map((q) => executeInstantWebSearch(q))
+          );
+
+          const seenUrls = new Set<string>();
+          for (const out of searchOutputs) {
+            for (const src of out.sources) {
+              if (!seenUrls.has(src.url) && liveSources.length < 8) {
+                seenUrls.add(src.url);
+                liveSources.push(src);
+              }
+            }
+          }
+        }
+      } catch (searchErr) {
+        console.warn("[LOT CHAT] Live search error, falling back:", searchErr);
+      }
+    }
+
+    // Fallback to legacy performWebGrounding if no live sources but shouldGround is set
     let searchResults: WebSearchResult[] = [];
-    const shouldGround = intentClassification.requiresWebSearch || body.enableGrounding === true;
-    if (shouldGround && query) {
+    const shouldGround = intentClassification.requiresWebSearch || forceWebSearch;
+    if (liveSources.length === 0 && shouldGround && query) {
       try {
         searchResults = await performWebGrounding(query);
       } catch (groundingErr) {
@@ -196,6 +251,8 @@ export async function POST(req: Request): Promise<Response> {
 
     // Master System Prompt (Guarantees Sharp Answers + Zero URL Hallucinations)
     const masterSystemPrompt = `You are LOT, an elite AI assistant and agentic coding OS.
+Current Date & Time (IST): ${currentDateTime}
+
 Follow these strict rules in every response:
 
 1. STRUCTURE & QUALITY:
@@ -205,8 +262,8 @@ Follow these strict rules in every response:
 
 2. STRICT URL & LINK RULES (NO BROKEN OR HALLUCINATED LINKS):
    - NEVER invent, guess, or construct URLs from memory.
-   - ONLY use the exact "Verified URL" provided in the [VERIFIED REAL-TIME GROUNDING] section.
-   - Format every link strictly as clean Markdown: [Source Name](https://exact-verified-url.com)
+   - ONLY use the exact "Verified URL" provided in the search grounding section.
+   - Format every link strictly as clean Markdown: [Source Name](https://exact-verified-url.com) or [[1]](https://exact-verified-url.com)
    - Never put punctuation (dots, commas, brackets) immediately touching a raw URL.
    - If no Verified URL is available in context, only mention well-known main domains (like https://github.com or https://react.dev) without deep paths.
 
@@ -241,7 +298,23 @@ Follow these strict rules in every response:
     }
 
     let groundingSystemContent = "";
-    if (searchResults && searchResults.length > 0) {
+    if (liveSources.length > 0) {
+      const liveSnippet = liveSources
+        .map(
+          (s, idx) =>
+            `[${idx + 1}] Title: ${s.title}${s.publishedDate ? ` (${s.publishedDate})` : ""}\nURL: ${s.url}\nDomain: ${s.domain}\nExtract:\n${s.snippet}`
+        )
+        .join("\n\n---\n\n");
+
+      groundingSystemContent = `\n\n[LIVE REAL-TIME WEB GROUNDING DATA - FETCHED RIGHT NOW (${currentDateTime})]:
+${liveSnippet}
+
+STRICT CITATION RULES:
+1. Treat the live search context above as the primary source of truth over your training memory.
+2. Cite facts inline using exact numbered Markdown links like [[1]](exact-url) or [Source Name](exact-url).
+3. NEVER invent, modify, or hallucinate URLs. Only use exact URLs from the search results above.
+4. Prioritize the most recent timestamps when multiple sources provide conflicting information.`;
+    } else if (searchResults && searchResults.length > 0) {
       const groundingSnippet = searchResults
         .map(
           (res, idx) =>
@@ -253,14 +326,6 @@ Follow these strict rules in every response:
     }
 
     const fullSystemPrompt = baseSystemPrompt + domainDirective + groundingSystemContent;
-
-    const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
-    const openaiClient = apiKey
-      ? new OpenAI({
-          baseURL: "https://integrate.api.nvidia.com/v1",
-          apiKey: apiKey.trim(),
-        })
-      : null;
 
     const { optimizedMessages, updatedSummary } = await buildInfiniteContext(
       openaiClient,
@@ -292,10 +357,32 @@ Follow these strict rules in every response:
                   model: preferredModel,
                   provider: "nvidia",
                   searchResults: searchResults || [],
+                  sources: liveSources || [],
+                  queries: rewrittenQueries || [],
                   summary: updatedSummary,
                 })}\n\n`
               )
             );
+
+            // 2. Stream verified live source cards to UI immediately before model starts typing
+            if (liveSources.length > 0) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    choices: [
+                      {
+                        delta: {
+                          content: `[LOT_SOURCES]${JSON.stringify({
+                            queries: rewrittenQueries,
+                            sources: liveSources,
+                          })}[/LOT_SOURCES]\n`,
+                        },
+                      },
+                    ],
+                  })}\n\n`
+                )
+              );
+            }
 
             let accumulatedContent = "";
 
@@ -550,12 +637,22 @@ Follow these strict rules in every response:
     };
 
     // Clean JSON Response
+    const formattedMessage =
+      liveSources.length > 0 && !modelResponse.content.includes("[LOT_SOURCES]")
+        ? `[LOT_SOURCES]${JSON.stringify({
+            queries: rewrittenQueries,
+            sources: liveSources,
+          })}[/LOT_SOURCES]\n${modelResponse.content}`
+        : modelResponse.content;
+
     const responsePayload: ChatApiResponse = {
-      message: modelResponse.content,
+      message: formattedMessage,
       intent: intentClassification.intent,
       modelUsed: modelResponse.modelUsed,
       provider: modelResponse.provider,
       searchResults: searchResults || [],
+      sources: liveSources || [],
+      queries: rewrittenQueries || [],
       summary: updatedSummary,
       artifacts,
     };

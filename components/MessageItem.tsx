@@ -24,6 +24,8 @@ import { auditCodeSecurity, SecurityVulnerability } from "@/lib/security/strixSe
 import { StreamingText } from "@/components/assistant-ui/elements/streaming-text";
 import { HeroImageGallery } from "./HeroImageGallery";
 import { cleanModelOutput } from "./cleanModelOutput";
+import { LiveSourceCards } from "./LiveSourceCards";
+import { DeepResearchTrace } from "./DeepResearchTrace";
 
 interface MessageItemProps {
   message: Message;
@@ -265,8 +267,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     (/\b(PRISM\s+Silicon|Die\s+Stack|\[3D_VIEWPORT\])\b/i.test(messageContent) &&
       !messageContent.includes("```"));
 
-  const { heroEntity, cleanMarkdown, followUps } = isUser
-    ? { heroEntity: null, cleanMarkdown: messageContent, followUps: [] }
+  const { heroEntity, cleanMarkdown, followUps, liveSources, searchQueries, deepSteps } = isUser
+    ? {
+        heroEntity: null,
+        cleanMarkdown: messageContent,
+        followUps: [],
+        liveSources: [],
+        searchQueries: [],
+        deepSteps: [],
+      }
     : cleanModelOutput(messageContent, userPrompt);
   const normalizedContent = cleanAndNormalizeMarkdown(cleanMarkdown);
 
@@ -312,7 +321,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         </div>
       )}
 
-      {/* 2. Thinking State */}
+      {/* 2. Deep Research Live Progress Trace (Multi-round search & extract) */}
+      {!isUser && deepSteps && deepSteps.length > 0 && (
+        <DeepResearchTrace
+          steps={deepSteps}
+          isStreaming={Boolean(isStreaming)}
+          reportMarkdown={normalizedContent}
+        />
+      )}
+
+      {/* 3. Verified Live Web Sources Strip */}
+      {!isUser && liveSources && liveSources.length > 0 && (
+        <LiveSourceCards sources={liveSources} queries={searchQueries} />
+      )}
+
+      {/* 4. Thinking State */}
       {isThinking ? (
         <div className="flex items-center space-x-2.5 py-2 text-zinc-400 text-xs animate-in fade-in duration-150">
           <img

@@ -359,7 +359,8 @@ export default function Home() {
   const handleSendMessage = async (
     content: string,
     attachment?: Attachment,
-    overrideFocus?: IndustryFocus
+    overrideFocus?: IndustryFocus,
+    options?: { forceWebSearch?: boolean; deepResearch?: boolean }
   ) => {
     if (!content.trim() && !attachment) return;
 
@@ -533,8 +534,25 @@ export default function Home() {
             content
           ));
 
-      const endpoint = isMultiAgentIntent ? "/api/swarm" : isCodingAgentQuery ? "/api/agent" : "/api/chat";
-      const requestBody = isMultiAgentIntent
+      const isDeepResearch = options?.deepResearch === true;
+
+      const endpoint = isDeepResearch
+        ? "/api/deep-research"
+        : isMultiAgentIntent
+        ? "/api/swarm"
+        : isCodingAgentQuery
+        ? "/api/agent"
+        : "/api/chat";
+
+      const requestBody = isDeepResearch
+        ? {
+            query: content,
+            messages: [...currentConv.messages, userMessage].map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          }
+        : isMultiAgentIntent
         ? {
             prompt: content,
             files: agentFiles,
@@ -558,6 +576,7 @@ export default function Home() {
             customPrompt,
             attachment,
             searchFocus: activeFocus,
+            forceWebSearch: options?.forceWebSearch,
             stream: true,
           };
 

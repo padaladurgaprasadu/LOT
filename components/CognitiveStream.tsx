@@ -42,7 +42,12 @@ export interface CognitiveStreamProps {
   messages: Message[];
   isLoading: boolean;
   userProfile?: UserProfile;
-  onSendMessage: (message: string, attachment?: Attachment, searchFocus?: IndustryFocus) => void;
+  onSendMessage: (
+    message: string,
+    attachment?: Attachment,
+    searchFocus?: IndustryFocus,
+    options?: { forceWebSearch?: boolean; deepResearch?: boolean }
+  ) => void;
   onStopGeneration?: () => void;
   onEditMessage?: (id: string, text: string) => void;
   onShareMessage?: (msg: Message) => void;
@@ -171,8 +176,13 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
     }, 50);
   };
 
-  const handleSendPrompt = (text: string, attachment?: Attachment, focus?: IndustryFocus) => {
-    onSendMessage(text, attachment, focus);
+  const handleSendPrompt = (
+    text: string,
+    attachment?: Attachment,
+    focus?: IndustryFocus,
+    options?: { forceWebSearch?: boolean; deepResearch?: boolean }
+  ) => {
+    onSendMessage(text, attachment, focus, options);
   };
 
   // Auto-scroll on new messages or during streaming

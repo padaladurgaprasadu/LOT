@@ -28,7 +28,12 @@ import { Attachment, IndustryFocus } from "@/lib/types";
 import { LotOsMode } from "@/lib/lot-os/types";
 
 export interface ChatInputProps {
-  onSendMessage: (message: string, attachment?: Attachment, searchFocus?: IndustryFocus) => void;
+  onSendMessage: (
+    message: string,
+    attachment?: Attachment,
+    searchFocus?: IndustryFocus,
+    options?: { forceWebSearch?: boolean; deepResearch?: boolean }
+  ) => void;
   isLoading: boolean;
   onStopGeneration?: () => void;
   onOpenScheduleTasks?: () => void;
@@ -58,6 +63,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [input, setInput] = useState("");
   const [internalFocus, setInternalFocus] = useState<IndustryFocus>(searchFocus);
+  const [forceWebSearch, setForceWebSearch] = useState(false);
+  const [deepResearch, setDeepResearch] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -271,7 +278,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       if (isListeningRef.current) {
         toggleSpeechRecognition();
       }
-      onSendMessage(input.trim(), attachment || undefined, internalFocus);
+      onSendMessage(input.trim(), attachment || undefined, internalFocus, {
+        forceWebSearch,
+        deepResearch,
+      });
       setInput("");
       setAttachment(null);
       if (textareaRef.current) {
@@ -632,8 +642,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           className="flex-1 bg-transparent border-0 resize-none text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-0 text-sm leading-relaxed px-2 py-1 max-h-[160px] custom-scrollbar font-sans"
         />
 
-        {/* Right Action Icons: Microphone (Whisper) & Send/Stop */}
+        {/* Right Action Icons: Web, Deep Research, Microphone (Whisper) & Send/Stop */}
         <div className="flex items-center space-x-1 mb-0.5 shrink-0 ml-1">
+          {/* Live Web Search Toggle */}
+          <button
+            type="button"
+            onClick={() => setForceWebSearch((prev) => !prev)}
+            className={`px-2 py-1 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1 active:scale-95 ${
+              forceWebSearch
+                ? "bg-blue-600/30 text-blue-300 border border-blue-500/50 shadow-sm"
+                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+            }`}
+            title={forceWebSearch ? "Live Web Search Active" : "Toggle Live Web Search"}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-[11px]">Web</span>
+          </button>
+
+          {/* Deep Research Toggle */}
+          <button
+            type="button"
+            onClick={() => setDeepResearch((prev) => !prev)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1 active:scale-95 ${
+              deepResearch
+                ? "bg-white text-black font-semibold shadow-md"
+                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+            }`}
+            title={deepResearch ? "Deep Research Mode Enabled" : "Enable Multi-Round Deep Research"}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-[11px]">Deep</span>
+          </button>
+
           {/* Voice Input Button */}
           <button
             type="button"
