@@ -342,7 +342,11 @@ STRICT CITATION RULES:
 
     // Fast-path: True Instant SSE Stream with Zero 45-second Buffering
     if (isStreaming) {
-      const preferredModel = body.model || body.modelOverride || "meta/llama-3.3-70b-instruct";
+      const rawModel = body.model || body.modelOverride || "";
+      const preferredModel =
+        rawModel && rawModel !== "meta/llama-3.3-70b-instruct" && rawModel !== "meta/llama-3.1-8b-instruct"
+          ? rawModel
+          : "nvidia/nemotron-3-ultra-550b-a55b";
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream({
@@ -402,29 +406,33 @@ STRICT CITATION RULES:
                 await new Promise((r) => setTimeout(r, 20));
               }
             } else {
-              // Direct NVIDIA NIM Real-Time Streaming with Ultra-Fast 4.5s Failover to 8B model
+              // Direct NVIDIA NIM Real-Time Streaming with Ultra-Fast Candidate Failover
               const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
               const candidates = [
                 preferredModel,
-                "meta/llama-3.3-70b-instruct",
-                "meta/llama-3.1-8b-instruct",
                 "nvidia/nemotron-3-ultra-550b-a55b",
+                "minimaxai/minimax-m3.1-flash",
+                "meta/muse-glimmer-30b",
+                "google/gemma-4-31b-it",
+                "moonshotai/kimi-k3.1-pro",
               ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
 
               let streamStarted = false;
 
               if (apiKey && apiKey.trim().length > 0) {
-                for (const candidate of candidates) {
+                for (let i = 0; i < candidates.length; i++) {
                   if (streamStarted) break;
+                  const candidate = candidates[i];
                   let timeoutId: NodeJS.Timeout | null = null;
                   try {
                     const nimController = new AbortController();
+                    const timeoutDuration = i === 0 ? 7000 : 4000;
                     timeoutId = setTimeout(() => {
                       if (!streamStarted) {
-                        console.warn(`[LOT CHAT] Candidate ${candidate} queued > 4.5s. Auto-switching to fast fallback...`);
+                        console.warn(`[LOT CHAT] Candidate ${candidate} queued > ${timeoutDuration}ms. Auto-switching to fast fallback...`);
                         nimController.abort();
                       }
-                    }, 4500); // 4.5s max wait for first token
+                    }, timeoutDuration);
 
                     const nimRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
                       method: "POST",
@@ -584,15 +592,20 @@ STRICT CITATION RULES:
       };
     } else {
       try {
+        const rawModel = body.model || body.modelOverride;
+        const targetModel =
+          rawModel && rawModel !== "meta/llama-3.3-70b-instruct" && rawModel !== "meta/llama-3.1-8b-instruct"
+            ? rawModel
+            : "nvidia/nemotron-3-ultra-550b-a55b";
         modelResponse = await executeModelWithFailover(modelMessages, {
-          preferredModel: body.model || body.modelOverride,
+          preferredModel: targetModel,
           temperature: typeof body.temperature === "number" ? body.temperature : 0.3,
           maxTokens: typeof body.maxTokens === "number" ? body.maxTokens : 4096,
         });
       } catch (execErr) {
         console.warn("[LOT CHAT] Remote failover error, synthesizing local sovereign response:", execErr);
         modelResponse = synthesizeLocalDiagnostic(modelMessages, {
-          preferredModel: body.model || body.modelOverride,
+          preferredModel: body.model || body.modelOverride || "nvidia/nemotron-3-ultra-550b-a55b",
         });
       }
     }
