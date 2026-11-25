@@ -31,23 +31,19 @@ class Settings(BaseSettings):
     PORT: int = Field(default=8000, description="FastAPI listening port")
     HOST: str = Field(default="0.0.0.0", description="FastAPI bind address")
 
-    # LiteLLM Gateway
-    LITELLM_BASE_URL: str = Field(default="http://localhost:4000", description="LiteLLM proxy endpoint")
-    LITELLM_MASTER_KEY: str = Field(
-        default="sk-lot-master-admin-key-flagship-mesh",
-        description="LiteLLM master administrative bearer key",
-    )
-
-    # 5 Pooled NVIDIA NIM Keys
+    # Direct NVIDIA NIM Gateway (Zero-LiteLLM)
     NVIDIA_NIM_BASE_URL: str = Field(
         default="https://integrate.api.nvidia.com/v1",
         description="Direct NVIDIA NIM API Base URL",
     )
-    NVIDIA_NIM_API_KEY_1: str = Field(default="", description="NIM pool key 1 (Daily chat & math)")
-    NVIDIA_NIM_API_KEY_2: str = Field(default="", description="NIM pool key 2 (DeepSeek SWE & PCB)")
-    NVIDIA_NIM_API_KEY_3: str = Field(default="", description="NIM pool key 3 (Mistral DOM & Multimodal)")
-    NVIDIA_NIM_API_KEY_4: str = Field(default="", description="NIM pool key 4 (GLM Tool planning)")
-    NVIDIA_NIM_API_KEY_5: str = Field(default="", description="NIM pool key 5 (Nemotron Planner & Embed)")
+    NVIDIA_API_KEY: str = Field(default="", description="Primary NVIDIA NIM API key")
+    NVIDIA_NIM_API_KEY: str = Field(default="", description="Alternate NVIDIA NIM API key")
+    NVIDIA_NIM_API_KEY_1: str = Field(default="", description="NIM pool key 1 (Everyday Lightning)")
+    NVIDIA_NIM_API_KEY_2: str = Field(default="", description="NIM pool key 2 (Nemotron Ultra Deep/Code)")
+    NVIDIA_NIM_API_KEY_3: str = Field(default="", description="NIM pool key 3 (Nemotron Super VL Tools/JSON)")
+    NVIDIA_NIM_API_KEY_4: str = Field(default="", description="NIM pool key 4 (MiniMax M3.1 Coding)")
+    NVIDIA_NIM_API_KEY_5: str = Field(default="", description="NIM pool key 5 (Nemotron Embed/Rerank/Parse)")
+    MAX_SEARCH_EXTRACT_URLS: int = Field(default=5, description="Top-N reranked URLs to extract per search")
 
     # Open-Higgsfield GPU Media Studio
     HIGGSFIELD_API_KEY: str = Field(default="", description="Higgsfield AI video cluster API key")

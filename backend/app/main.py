@@ -5,6 +5,7 @@ FastAPI application delivering Server-Sent Events (SSE) streaming envelopes:
 Orchestrates the 7 Heavyweight NIM Engines across PCB, SWE Code, Browser CDP, and Mem0 Memory.
 """
 
+import os
 import json
 import asyncio
 import logging
@@ -23,6 +24,7 @@ from app.engines.code_engine import code_engine
 from app.engines.browser_agent import browser_agent
 from app.engines.higgsfield_engine import higgsfield_engine
 from app.engines.lot_nim_router import lot_stream, lot_complete, NIM_CATALOG, INTENT_TO_TIER_MAP
+from app.engines.policy_guard import redact_secrets
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("LOTMicroKernel")
@@ -85,11 +87,12 @@ async def health_check():
 async def get_system_info():
     return {
         "os": "LOT Autonomous Agentic AIOS",
-        "architecture": "LLM-as-OS Micro-Kernel (Cerebrum + AIOS + LiteLLM)",
+        "architecture": "Zero-LiteLLM Direct NVIDIA NIM Micro-Kernel",
         "model_matrix_heavyweight_only": True,
         "models": {k: v.model_dump() for k, v in FLAGSHIP_SPECS.items()},
+        "nim_catalog": NIM_CATALOG,
         "memory_dimensions": 4096,
-        "hitl_security_gate": "3-Tier Financial Guardrail Active",
+        "hitl_security_gate": "3-Tier Financial + CEL Policy Guard Active",
     }
 
 
@@ -125,37 +128,49 @@ async def generate_sse_chat_stream(
         "provider": spec.provider,
         "parameters": spec.parameters,
         "mode": route.intent,
+        "product_mode": route.product_mode,
+        "indic_script_detected": route.indic_script_detected,
         "session_id": session_id,
         "tier": tier,
         "latency_ms": route.latency_ms,
     }
     yield f"event: meta\ndata: {json.dumps(meta_payload)}\n\n"
-    await asyncio.sleep(0.02)
+    await asyncio.sleep(0.01)
 
-    # 2. Zero-404 search grounding
-    citations = await search_engine.search_and_verify(last_user_msg, max_results=3)
+    # 2. Grounded search ONLY when needed (skip for static Everyday / Code prompts to save latency)
+    needs_search = route.product_mode == "deep_analysis" or any(
+        kw in last_user_msg.lower()
+        for kw in ("latest", "today", "news", "2026", "rate", "price", "circular", "http://", "https://")
+    )
+    citations: List[VerifiedCitation] = []
+    if needs_search:
+        citations = await search_engine.search_and_verify(
+            route.query or last_user_msg,
+            max_results=5,
+            extract_top_pages=(route.product_mode == "deep_analysis"),
+        )
     yield f"event: citations\ndata: {json.dumps([c.model_dump() for c in citations])}\n\n"
-    await asyncio.sleep(0.02)
+    await asyncio.sleep(0.01)
 
     # 3. Reasoning trace tokens (<think> pill)
     reasoning_steps = [
-        f"Analyzing intent via deterministic classifier: identified '{route.intent}' in {route.latency_ms}ms.",
-        f"Selected flagship model: {spec.name} ({spec.parameters}) with reasoning_effort: {spec.reasoning_effort or 'standard'}.",
-        f"Retrieved {len(citations)} verified status-200 live web citations with zero 404s.",
-        "Synthesizing high-precision response and context-aware artifact dock payload...",
+        f"Mode '{route.product_mode}' ({route.intent}) classified in {route.latency_ms}ms.",
+        f"Selected verified NIM model: {spec.name} ({spec.parameters}) with reasoning_effort={spec.reasoning_effort or 'low'}.",
+        f"Grounded citations retrieved: {len(citations)} verified live sources (SSRF & challenge filtered)." if needs_search else "Skipped web search for low-TTFT direct reasoning.",
     ]
     for step in reasoning_steps:
         reasoning_data = {"token": f"{step}\n"}
         yield f"event: reasoning\ndata: {json.dumps(reasoning_data)}\n\n"
-        await asyncio.sleep(0.04)
+        await asyncio.sleep(0.02)
 
     # 4. Live NIM Stream with Zero-LiteLLM Routing & Deterministic Artifact Synthesis
-    nim_tier = INTENT_TO_TIER_MAP.get(route.intent, tier if tier in NIM_CATALOG else "flagship")
-    enable_thinking = nim_tier in ["flagship", "orchestrator"] and route.intent != "CHAT"
+    nim_tier = INTENT_TO_TIER_MAP.get(route.intent, tier if tier in NIM_CATALOG else "everyday")
+    enable_thinking = nim_tier in ["flagship", "orchestrator"] and route.product_mode != "everyday"
     has_nim_key = bool(
         os.environ.get("NVIDIA_API_KEY")
         or os.environ.get("NVIDIA_NIM_API_KEY")
         or os.environ.get("LOT_BACKEND_KEY")
+        or os.environ.get("NVIDIA_NIM_API_KEY_1")
     )
 
     streamed_live = False
@@ -184,7 +199,32 @@ async def generate_sse_chat_stream(
 
     # Attempt direct live stream from NVIDIA NIM
     if has_nim_key:
-        msg_dicts = [{"role": m.role, "content": m.content} for m in messages]
+        msg_dicts = [{"role": m.role, "content": redact_secrets(m.content)} for m in messages]
+        if citations:
+            citation_ctx = "\n\n".join(
+                f"[{idx + 1}] {c.title}\nURL: {c.url}\nContent: {c.extracted_content or c.snippet}"
+                for idx, c in enumerate(citations)
+            )
+            msg_dicts.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": (
+                        "Always respond strictly in clean, fluent English (never use non-English prose or transliterated phrases). "
+                        "Answer strictly from the verified live sources below using inline [n] citations. "
+                        "If a specific metric or date is missing from the sources, state that it was not found.\n\n"
+                        f"{citation_ctx}"
+                    ),
+                },
+            )
+        else:
+            msg_dicts.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": "Always respond strictly in clean, fluent English (never use non-English prose or transliterated phrases).",
+                },
+            )
         try:
             async for chunk in lot_stream(
                 messages=msg_dicts,

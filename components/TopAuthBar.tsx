@@ -67,15 +67,15 @@ export function TopAuthBar({ user, onOpenAuth, onLogout }: TopAuthBarProps) {
 
       {/* Profile Details Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-neutral-800 bg-neutral-950/95 p-3.5 text-white shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-neutral-800 bg-[#111114] p-3.5 text-white">
           {user ? (
             <div>
               {/* Profile Card */}
               {(() => {
                 const displayName = extractFirstName(user.name, user.email) || user.name || "Prasad";
                 return (
-                  <div className="flex items-center gap-3 p-2 rounded-xl bg-neutral-900/60 border border-neutral-800/80">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-neutral-800 to-neutral-700 text-sm font-bold uppercase text-white shadow-inner">
+                  <div className="flex items-center gap-3 p-2 rounded-xl bg-neutral-900 border border-neutral-800">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 border border-neutral-700 text-sm font-bold uppercase text-white">
                       {displayName.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">

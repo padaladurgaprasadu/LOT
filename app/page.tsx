@@ -104,7 +104,6 @@ export default function Home() {
   // Load state and check server session on mount
   useEffect(() => {
     let isMounted = true;
-    const controller = new AbortController();
 
     setSelectedModel(getStoredModel());
 
@@ -146,7 +145,7 @@ export default function Home() {
       });
     }
 
-    fetch("/api/auth/me", { signal: controller.signal })
+    fetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
@@ -190,7 +189,6 @@ export default function Home() {
 
     return () => {
       isMounted = false;
-      controller.abort();
     };
   }, []);
 
@@ -462,7 +460,7 @@ export default function Home() {
     let resolvedHeroData: EntityHeroData | null = null;
 
     const isTechnicalQuery =
-      /\b(code|coding|program|programming|python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|react|vue|angular|nextjs|node|django|flask|loop|for\s+loop|while|if|else|if\s+else|switch|case|function|def|class|variable|array|object|json|api|sdk|algorithm|data\s+structure|git|github|debug|bug|error|exception|syntax|install|import|export|npm|pip|tutorial|how\s+to|what\s+is|explain|write|create|build|make|run|compile|test|math|equation|calculate|formula)\b/i.test(
+      /\b(code|coding|program|programming|python|javascript|typescript|java|c\+\+|c#|rust|golang|html|css|sql|react|vue|angular|nextjs|node|django|flask|loop|for\s+loop|while|if|else|if\s+else|switch|case|function|def|class|variable|array|object|json|api|sdk|algorithm|data\s+structure|git|github|debug|bug|error|exception|syntax|install|import|export|npm|pip|tutorial|how\s+to|what\s+is|explain|write|create|build|make|run|compile|test|math|equation|calculate|formula|time|date|gold|silver|rate|price|weather|stock|usd|inr)\b/i.test(
         content.trim()
       );
 
@@ -804,6 +802,31 @@ export default function Home() {
               } else if (data.artifacts.autonomousAction) {
                 setActiveMode("agent");
               }
+            }
+
+            // Capture model + mode metadata from SSE stream
+            if (data.type === "metadata" && data.model) {
+              const modeLabel = isDeepResearch
+                ? "Deep Research"
+                : options?.forceWebSearch
+                ? "Web Grounded"
+                : data.intent === "APP_PREVIEW" || data.intent === "PCB_HARDWARE" || isCodingAgentQuery
+                ? "Code & Complex"
+                : "Everyday";
+              setConversations((prev) =>
+                prev.map((c) =>
+                  c.id !== targetConvId
+                    ? c
+                    : {
+                        ...c,
+                        messages: c.messages.map((m) =>
+                          m.id === assistantMessageId
+                            ? { ...m, model: data.model, modeLabel }
+                            : m
+                        ),
+                      }
+                )
+              );
             }
 
             // Dynamic Intent Routing from server

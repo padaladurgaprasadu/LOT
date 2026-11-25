@@ -179,8 +179,12 @@ export function checkRequiresWebSearch(query: string, intent: QueryIntent): bool
     return false;
   }
 
-  // Pure date/time queries are handled by server clock
-  if (/^(what('?s| is)?\s+)?(today('?s)?\s+date|current\s+(date|time|year|month|day)|date\s+today|what\s+day\s+is\s+(it|today)|time\s+now)[\s!?.]*$/i.test(clean)) {
+  // Pure date/time queries (including India/Andhra Pradesh/IST) are handled by server clock
+  if (
+    /^(what('?s| is)?\s+(the\s+)?)?(today('?s)?\s+date|current\s+(date|time|year|month|day)|date\s+today|what\s+day\s+is\s+(it|today)|time\s+now)(\s+(in|at)\s+(india|ist|andhra\s+pradesh|ap|telangana|hyderabad|vijayawada|visakhapatnam|tirupati))?[\s!?.]*$/i.test(
+      clean
+    )
+  ) {
     return false;
   }
 

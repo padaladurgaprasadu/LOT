@@ -10,6 +10,7 @@
  */
 
 import dns from "node:dns";
+import { verifyAndDeduplicateSources, sanitizeUntrustedWebText } from "./policyGuard";
 
 // Optimize DNS resolution order to eliminate NAT64/IPv6 handshake delays
 try {
@@ -154,7 +155,7 @@ async function fetchFromGoogleNews(query: string, maxResults: number, signal: Ab
   signal.addEventListener("abort", onAbort, { once: true });
 
   try {
-    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-IN&gl=IN&ceid=IN:en`;
 
     const res = await fetch(rssUrl, {
       method: "GET",
@@ -256,19 +257,13 @@ export async function performWebGrounding(query: string, maxResults = 5): Promis
 
     clearTimeout(timeoutId);
 
-    // Deduplicate by URL
-    const seenUrls = new Set<string>();
-    const uniqueResults: WebSearchResult[] = [];
-
-    for (const item of aggregated) {
-      if (!seenUrls.has(item.url)) {
-        seenUrls.add(item.url);
-        uniqueResults.push(item);
-      }
-      if (uniqueResults.length >= limit) break;
-    }
-
-    return uniqueResults;
+    // Deduplicate and live-probe URLs so broken/404 links are never returned
+    const cleaned = aggregated.map((item) => ({
+      ...item,
+      snippet: sanitizeUntrustedWebText(item.snippet),
+    }));
+    const verified = await verifyAndDeduplicateSources(cleanQuery, cleaned, limit);
+    return verified;
   } catch {
     clearTimeout(timeoutId);
     return [];

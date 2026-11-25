@@ -26,6 +26,7 @@ import { HeroImageGallery } from "./HeroImageGallery";
 import { cleanModelOutput } from "./cleanModelOutput";
 import { LiveSourceCards } from "./LiveSourceCards";
 import { DeepResearchTrace } from "./DeepResearchTrace";
+import { isAllowedGroundedLink } from "@/lib/intelligence/policyGuard";
 
 interface MessageItemProps {
   message: Message;
@@ -49,9 +50,6 @@ export function cleanAndNormalizeMarkdown(content: string): string {
 
   // 0b. Extract/Strip [HERO: Entity Name] tag if present
   formatted = formatted.replace(/^\[HERO:\s*(.+?)\]\s*/im, "").trim();
-
-  // 0c. Fix broken leading bold asterisks like "Tirupati (Tirumala)**" -> "**Tirupati (Tirumala)**"
-  formatted = formatted.replace(/^([A-Za-z0-9][^\n*]{1,60})\*\*/m, "**$1**");
 
   // 0. Strip opening echo heading — model sometimes starts with a heading that is
   //    EXACTLY a generic word like "## Greeting", "## Answer", "## Response".
@@ -106,10 +104,40 @@ export function cleanAndNormalizeMarkdown(content: string): string {
   // 10. Ensure blank lines around code fences
   formatted = formatted.replace(/([^\n])\n(```)/g, "$1\n\n$2");
 
-  // 11. Normalize excessive newlines
+  // 11. Fix unclosed bold prefixes like "**1. Choose DuckDB:"
+  formatted = formatted.replace(/^(\s*(?:[-*]|\d+\.)?\s*)\*\*([^*\n]{2,80}:)(?!\*\*)/gm, "$1**$2**");
+
+  // 12. Normalize excessive newlines
   formatted = formatted.replace(/\n{4,}/g, "\n\n\n");
 
   return formatted.trim();
+}
+
+/**
+ * Strips common TypeScript type syntax so browser sandbox `new Function()` can run TS snippets cleanly.
+ */
+export function transpileSimpleTypeScript(code: string): string {
+  let out = code
+    .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
+    .replace(/^\s*(?:export\s+)?(?:interface|type)\s+\w+[\s\S]*?(?:\n\}|;)\s*$/gm, "")
+    .replace(/^\s*export\s+(?:default\s+)?/gm, "")
+    .replace(/^\/\/.*$/gm, "");
+
+  // Strip function return types (`): number {` or `): Promise<void> {`)
+  out = out.replace(/\)\s*:\s*[A-Za-z_$][\w$<>[\]|&\s{},.?]*(\s*(?:\{|=>))/g, ")$1");
+  // Strip parameter type annotations (`(a: number, b: string)` -> `(a, b)`)
+  out = out.replace(
+    /([(,]\s*(?:\.\.\.)?[A-Za-z_$][\w$]*)\s*\??\s*:\s*[A-Za-z_$][\w$<>[\]|&\s{},.?]*(?=[,)=])/g,
+    "$1"
+  );
+  // Strip variable type annotations (`const x: number = 1` -> `const x = 1`)
+  out = out.replace(
+    /\b(const|let|var)\s+([A-Za-z_$][\w$]*)\s*:\s*[A-Za-z_$][\w$<>[\]|&\s{},.?]*=/g,
+    "$1 $2 ="
+  );
+  // Strip `as Type` assertions
+  out = out.replace(/\s+as\s+[A-Za-z_$][\w$<>[\]|&.]*/g, "");
+  return out.trim();
 }
 
 
@@ -154,15 +182,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         console.error = (...args) => logs.push(`[ERROR] ${args.join(" ")}`);
         console.warn = (...args) => logs.push(`[WARN] ${args.join(" ")}`);
 
-        const cleanCode = codeText.replace(/^\/\/.*$/gm, "").trim();
+        const cleanCode =
+          normalizedLang === "typescript" || normalizedLang === "ts"
+            ? transpileSimpleTypeScript(codeText)
+            : codeText.replace(/^\/\/.*$/gm, "").trim();
         const fn = new Function(cleanCode);
         let result: unknown;
         try {
           result = fn();
         } finally {
-          // These restores used to sit after fn(), so any snippet that threw left
-          // console.log/error/warn permanently hijacked for the rest of the session —
-          // every later log silently went into this run's `logs` array instead.
           console.log = originalLog;
           console.error = originalError;
           console.warn = originalWarn;
@@ -174,11 +202,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             ? `${outputText}\n\nReturned: ${JSON.stringify(result, null, 2)}`
             : `Returned: ${JSON.stringify(result, null, 2)}`;
         }
+        if (!outputText) {
+          const fnMatch = cleanCode.match(/function\s+([A-Za-z_$][\w$]*)\s*\(/);
+          outputText = fnMatch
+            ? `Compiled and defined \`${fnMatch[1]}()\` successfully with 0 syntax errors.`
+            : "Code compiled and executed cleanly with zero output.";
+        }
 
         setCodeOutputs((prev) => ({
           ...prev,
           [blockId]: {
-            output: outputText || "Code executed successfully with zero output.",
+            output: outputText,
             isError: false,
           },
         }));
@@ -292,6 +326,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       ? heroEntity
       : null;
 
+  const verifiedSourceUrls = (liveSources || []).map((s) => s.url).filter(Boolean);
+
   return (
     <div className="w-full py-3 flex flex-col items-start px-3 sm:px-4 max-w-3xl mx-auto animate-in fade-in duration-150">
       {/* 1. ChatGPT-Style 4-Photo Bento Hero Gallery (Places, Monuments, People, Landmarks only) */}
@@ -301,7 +337,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
       {/* Fallback to single hero banner only if verified real place/entity and NOT technical */}
       {!isUser && !effectiveHeroEntity && message.heroImage && message.heroImage.imageUrl && !isExcludedConcept.test(message.heroImage.title) && !isExcludedConcept.test(userPrompt) && (
-        <div className="mb-4 w-full max-w-sm sm:max-w-md rounded-2xl overflow-hidden border border-zinc-800 bg-[#0e0e11] shadow-xl">
+        <div className="mb-4 w-full max-w-sm sm:max-w-md rounded-xl overflow-hidden border border-zinc-800 bg-[#111114]">
           <div className="relative w-full aspect-[16/10] max-h-56 bg-zinc-900 overflow-hidden">
             <img
               src={message.heroImage.imageUrl}
@@ -359,12 +395,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 );
               },
               a({ href, children, ...props }) {
+                const safeHref = typeof href === "string" ? href : "";
+                const allowed = isAllowedGroundedLink(
+                  safeHref,
+                  verifiedSourceUrls.length > 0 ? verifiedSourceUrls : undefined
+                );
+                if (!allowed) {
+                  return <span className="text-zinc-300 font-medium">{children}</span>;
+                }
                 return (
                   <a
-                    href={href}
+                    href={safeHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-400 underline hover:text-blue-300 font-medium break-all transition-colors"
+                    className="text-zinc-100 underline decoration-zinc-500 hover:decoration-white font-medium break-all transition-colors"
                     {...props}
                   >
                     {children}
@@ -383,7 +427,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               },
               table({ node, children, ...props }) {
                 return (
-                  <div className="my-5 w-full overflow-x-auto rounded-2xl border border-zinc-800 bg-[#0e0e12] shadow-xl">
+                  <div className="my-5 w-full overflow-x-auto rounded-xl border border-zinc-800 bg-[#111114]">
                     <table className="w-full text-left border-collapse text-xs sm:text-sm" {...props}>
                       {children}
                     </table>
@@ -479,7 +523,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 const isRunning = runningCodeId === blockId;
 
                 return (
-                  <div className="relative my-4 rounded-2xl overflow-hidden border border-zinc-800 bg-[#0d0d10] shadow-xl">
+                  <div className="relative my-4 rounded-xl overflow-hidden border border-zinc-800 bg-[#111114]">
                     {/* Code Header */}
                     <div className="flex items-center justify-between px-4 py-2 bg-[#141418] border-b border-zinc-800/80 text-xs text-zinc-400">
                       <span className="font-mono text-zinc-300 font-semibold lowercase">{language}</span>
@@ -602,11 +646,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {normalizedContent}
           </ReactMarkdown>
 
-          {/* Smooth Pulsing Live Streaming Caret */}
+          {/* Calm Minimal Streaming Caret (No glow) */}
           {isStreaming && (
             <span
               aria-hidden
-              className="inline-block h-3.5 w-1.5 animate-pulse rounded-full bg-blue-500 dark:bg-blue-400 align-middle ml-1 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
+              className="inline-block h-3.5 w-1.5 rounded-sm bg-zinc-400 align-middle ml-1"
             />
           )}
 
@@ -617,21 +661,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           <div className="flex items-center space-x-2 mt-3 text-zinc-400">
             <button
               onClick={() => handleCopy(message.content)}
-              className="p-1 text-zinc-400 hover:text-white rounded-md hover:bg-zinc-800/40 transition-all duration-150 active:scale-95"
+              className="p-1 text-zinc-400 hover:text-white rounded-md hover:bg-zinc-800/60 transition-colors"
               title="Copy response"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-300" />}
             </button>
             <button
               onClick={() => onShareMessage && onShareMessage(message)}
-              className="p-1 text-zinc-400 hover:text-white rounded-md hover:bg-zinc-800/40 transition-all duration-150 active:scale-95"
+              className="p-1 text-zinc-400 hover:text-white rounded-md hover:bg-zinc-800/60 transition-colors"
               title="Share response"
             >
               <Share2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setLiked(liked === true ? null : true)}
-              className={`p-1 rounded-md hover:bg-zinc-800/40 transition-all duration-150 active:scale-95 ${
+              className={`p-1 rounded-md hover:bg-zinc-800/60 transition-colors ${
                 liked === true ? "text-emerald-400" : "text-zinc-400 hover:text-white"
               }`}
               title="Good response"
@@ -640,7 +684,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </button>
             <button
               onClick={() => setLiked(liked === false ? null : false)}
-              className={`p-1 rounded-md hover:bg-zinc-800/40 transition-all duration-150 active:scale-95 ${
+              className={`p-1 rounded-md hover:bg-zinc-800/60 transition-colors ${
                 liked === false ? "text-red-400" : "text-zinc-400 hover:text-white"
               }`}
               title="Bad response"

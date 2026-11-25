@@ -29,28 +29,41 @@ search:
     - json
 
 engines:
+  # Google and Bing are disabled by default to prevent silent server-IP CAPTCHAs
   - name: google
     engine: google
     shortcut: g
     timeout: 3.0
-    disabled: false
+    disabled: true
 
   - name: duckduckgo
     engine: duckduckgo
     shortcut: ddg
-    timeout: 3.0
+    timeout: 3.5
     disabled: false
 
   - name: bing
     engine: bing
     shortcut: b
     timeout: 3.0
+    disabled: true
+
+  - name: qwant
+    engine: qwant
+    shortcut: qw
+    timeout: 3.5
+    disabled: false
+
+  - name: mojeek
+    engine: mojeek
+    shortcut: mj
+    timeout: 3.5
     disabled: false
 
   - name: brave
     engine: brave
     shortcut: br
-    timeout: 3.0
+    timeout: 3.5
     disabled: false
 
   - name: github

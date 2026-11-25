@@ -249,9 +249,9 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
               {/* Embedded Action Card Preview if tool/payload detected */}
               {actionPreview && (
                   <div className="w-full max-w-4xl mx-auto my-2">
-                    <div className="rounded-xl border border-zinc-800 bg-gradient-to-r from-zinc-900/90 via-zinc-900/60 to-black p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="rounded-xl border border-zinc-800 bg-[#111114] p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
+                        <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 shrink-0">
                           {actionPreview.type === "food" ? (
                             <UtensilsCrossed className="w-4 h-4 text-amber-400" />
                           ) : actionPreview.type === "command" ? (

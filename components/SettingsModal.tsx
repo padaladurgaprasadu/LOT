@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Cpu, Check, Save, Zap } from "lucide-react";
 import { LOT_SYSTEM_PROMPT } from "@/lib/nvidia";
 
@@ -22,6 +22,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [localPrompt, setLocalPrompt] = useState(customPrompt || LOT_SYSTEM_PROMPT);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSave = (e: React.FormEvent) => {
@@ -35,8 +44,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg bg-[#0e0e10] border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative w-full max-w-lg bg-[#111114] border border-zinc-800 rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/30">
           <div className="flex items-center space-x-3">
@@ -70,7 +84,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-zinc-400 leading-relaxed">
-              LOT dynamically routes your queries across lightning 8B sub-second models and deep 70B reasoning clusters with automatic fallback and parallel execution. No manual selection required.
+              LOT routes your queries across Nemotron 3.5 Lightning (Everyday), Nemotron 3 Ultra (Deep Analysis), and Nemotron 3.5 Super VL / MiniMax M3.1 (Coding) with automatic failover and zero-broken-link web verification.
             </p>
           </div>
 
@@ -112,7 +126,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="submit"
               disabled={savedSuccess}
-              className="flex items-center space-x-2 px-5 py-2 bg-white text-black hover:bg-zinc-200 text-xs font-semibold rounded-xl transition-all active:scale-95 shadow-md"
+              className="flex items-center space-x-2 px-5 py-2 bg-white text-black hover:bg-zinc-200 text-xs font-semibold rounded-xl transition-colors"
             >
               {savedSuccess ? (
                 <>

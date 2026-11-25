@@ -16,6 +16,12 @@
 import OpenAI from 'openai';
 import { executeInstantWebSearch, LiveSource } from '@/lib/liveWebSearch';
 import { extractDeepPages } from '@/lib/deepExtractor';
+import { VERIFIED_NIM_MODELS } from '@/lib/intelligence/nimCatalog';
+import {
+  normalizeIndicText,
+  sanitizeUntrustedWebText,
+  verifyAndDeduplicateSources,
+} from '@/lib/intelligence/policyGuard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,7 +66,7 @@ async function generateJsonList(
 ): Promise<string[]> {
   try {
     const res = await client.chat.completions.create({
-      model: 'meta/llama-3.3-70b-instruct',
+      model: VERIFIED_NIM_MODELS.EVERYDAY_FAST,
       temperature: 0.1,
       max_tokens: 240,
       messages: [
@@ -83,12 +89,13 @@ async function generateJsonList(
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const query =
+    const rawQuery =
       typeof body.query === 'string' && body.query.trim()
         ? body.query.trim()
         : Array.isArray(body.messages) && body.messages.length > 0
         ? String(body.messages[body.messages.length - 1]?.content || '').trim()
         : '';
+    const query = normalizeIndicText(rawQuery);
 
     if (!query) {
       return new Response(JSON.stringify({ error: 'Missing research query' }), {
@@ -196,7 +203,9 @@ export async function POST(req: Request) {
             }
           }
 
-          const allSources = Array.from(sourceMap.values()).slice(0, 12);
+          const allRawSources = Array.from(sourceMap.values());
+          // Deduplicate, pre-rerank, and verify HTTP 200-399 reachability BEFORE scraping
+          const allSources = await verifyAndDeduplicateSources(query, allRawSources, 5);
 
           // Emit verified source cards to UI immediately
           emitChunk(
@@ -206,11 +215,11 @@ export async function POST(req: Request) {
             })}[/LOT_SOURCES]\n`
           );
 
-          // STAGE 4: Full-Page Extraction on Top 10 URLs
-          const targetUrls = allSources.slice(0, 10).map((s) => s.url);
+          // STAGE 4: Full-Page Extraction on Top 5 Pre-Reranked URLs
+          const targetUrls = allSources.map((s) => s.url);
           emitStep({
             stage: 'extract',
-            label: `Reading full content from ${targetUrls.length} live pages...`,
+            label: `Reading full content from top ${targetUrls.length} reranked pages...`,
             count: targetUrls.length,
           });
 
@@ -218,15 +227,15 @@ export async function POST(req: Request) {
 
           emitStep({
             stage: 'synthesize',
-            label: `Synthesizing deep report from ${extractedPages.length || allSources.length} sources...`,
+            label: `Synthesizing deep report from ${extractedPages.length || allSources.length} verified sources...`,
             count: extractedPages.length || allSources.length,
           });
 
-          // Build numbered research dossier combining extracted pages + fallback snippets
+          // Build numbered research dossier combining extracted pages + sanitized snippets
           const extractedByUrl = new Map(extractedPages.map((p) => [p.url, p.content]));
           const researchDossier = allSources
             .map((src, idx) => {
-              const fullText = extractedByUrl.get(src.url) || src.snippet;
+              const fullText = extractedByUrl.get(src.url) || sanitizeUntrustedWebText(src.snippet);
               return `[SOURCE ${idx + 1}]
 Title: ${src.title}
 URL: ${src.url}
@@ -236,31 +245,51 @@ ${fullText.slice(0, 2200)}`;
             })
             .join('\n\n---\n\n');
 
-          // STAGE 5: Stream Full Structured Technical Report
-          const reportStream = await client.chat.completions.create({
-            model: 'meta/llama-3.3-70b-instruct',
-            temperature: 0.2,
-            max_tokens: 4096,
-            stream: true,
-            messages: [
-              {
-                role: 'system',
-                content: `You are the LOT Deep Research Engine. Today's date is ${today}.
-Synthesize an executive-grade, rigorous technical report strictly grounded in the provided [RESEARCH DOSSIER].
+          // STAGE 5: Stream Full Structured Technical Report (Nemotron-3-Ultra -> Super VL fallback)
+          const synthesisModels = [
+            VERIFIED_NIM_MODELS.DEEP_ULTRA,
+            VERIFIED_NIM_MODELS.TOOLS_MULTIMODAL,
+            VERIFIED_NIM_MODELS.FLAGSHIP_BACKUP,
+          ];
+          let reportStream: AsyncIterable<any> | null = null;
+          let lastSynthErr: unknown = null;
+
+          for (const synthModel of synthesisModels) {
+            try {
+              reportStream = await client.chat.completions.create({
+                model: synthModel,
+                temperature: 0.2,
+                max_tokens: 4096,
+                stream: true,
+                messages: [
+                  {
+                    role: 'system',
+                    content: `You are the LOT Deep Research Engine. Today's date is ${today}.
+Synthesize a rigorous, readable report strictly grounded in the provided [RESEARCH DOSSIER].
 
 FORMATTING GUIDELINES:
-1. Start directly with an Executive Summary.
-2. Structure the report with clear Markdown headings (## and ###), concrete figures, metrics, and at least one Markdown comparison table where appropriate.
-3. Cite every major claim inline using exact numbered Markdown links: [[1]](exact_url) or [[2]](exact_url).
-4. Never invent metrics, benchmarks, or URLs. If sources conflict, explicitly note the discrepancy and prioritize the more recent date.
-5. Conclude with Key Takeaways and Architectural Considerations.`,
-              },
-              {
-                role: 'user',
-                content: `RESEARCH TOPIC: ${query}\n\n[RESEARCH DOSSIER]:\n${researchDossier.slice(0, 26000)}`,
-              },
-            ],
-          });
+1. Always write the entire report strictly in clean, fluent English (never use non-English prose or transliterated phrases).
+2. If the user asks for a specific format or length (e.g., "in 4 bullets", "short summary", "table only"), strictly honor that exact constraint first.
+3. Otherwise, start with a clear Executive Summary, use Markdown headings (## and ###), and include a comparison table where appropriate.
+4. Keep all bold syntax strictly balanced (**term**) with no stray asterisks.
+5. Cite every major claim inline using exact numbered Markdown links: [[1]](exact_url) or [[2]](exact_url).
+6. Never invent metrics, benchmarks, or URLs. ONLY use exact verified URLs present in [RESEARCH DOSSIER]. If a fact or date is missing, state it was not found in retrieved sources.`,
+                  },
+                  {
+                    role: 'user',
+                    content: `RESEARCH TOPIC: ${query}\n\n[RESEARCH DOSSIER]:\n${researchDossier.slice(0, 26000)}`,
+                  },
+                ],
+              });
+              break;
+            } catch (err) {
+              lastSynthErr = err;
+            }
+          }
+
+          if (!reportStream) {
+            throw lastSynthErr || new Error('All deep synthesis NIM endpoints failed');
+          }
 
           for await (const chunk of reportStream) {
             const token = chunk.choices?.[0]?.delta?.content || '';

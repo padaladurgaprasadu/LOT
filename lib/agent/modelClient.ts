@@ -11,6 +11,7 @@
  */
 
 import https from "node:https";
+import { NIM_CODING_CANDIDATES, VERIFIED_NIM_MODELS, getNimApiKeyPool } from "../intelligence/nimCatalog";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -109,26 +110,18 @@ function postCompletion(provider: ProviderConfig, messages: ChatMessage[], opts:
  * NVIDIA NIM Coding Models matrix.
  * Frontier agentic coding models on NVIDIA NIM with 0-downtime failover rotation.
  */
-export const LOT_CODING_MODELS = [
-  "meta/muse-glimmer-30b",
-  "nvidia/nemotron-3-ultra-550b-a55b",
-  "poolside/laguna-xs-2.1",
-  "minimaxai/minimax-m3.1-flash",
-  "google/gemma-4-31b-it",
-  "nvidia/nemotron-3.5-super-vl-120b-a12b",
-  "moonshotai/kimi-k3.1-pro",
-] as const;
+export const LOT_CODING_MODELS = NIM_CODING_CANDIDATES;
 
-export const LOT_CODE_MODEL = process.env.LOT_CODE_MODEL || "meta/muse-glimmer-30b";
+export const LOT_CODE_MODEL = process.env.LOT_CODE_MODEL || VERIFIED_NIM_MODELS.TOOLS_MULTIMODAL;
 
 export function isModelConfigured(): boolean {
-  return Boolean(process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY || process.env.GROQ_API_KEY);
+  return Boolean(getNimApiKeyPool().length > 0 || process.env.GROQ_API_KEY);
 }
 
 /**
  * Runs one completion, trying primary NVIDIA coding model and rotating across the
- * full NVIDIA NIM coding matrix (Kimi 3T, MiniMax M3.1, Nemotron 3.5 Super VL,
- * Laguna-XS, Nemotron-3 Ultra 550B, Gemma-4 31B), then falling back to Groq.
+ * verified active NVIDIA NIM coding matrix (Nemotron 3.5 Super VL, Nemotron-3 Ultra 550B,
+ * MiniMax M3.1 Flash, Laguna-XS 2.1, Mistral Large 4), then falling back to Groq.
  */
 export async function completeWithModel(messages: ChatMessage[], options: CompletionOptions = {}): Promise<string> {
   const opts: Required<CompletionOptions> = {
@@ -137,21 +130,13 @@ export async function completeWithModel(messages: ChatMessage[], options: Comple
     timeoutMs: options.timeoutMs ?? 20000,
   };
 
-  const nvidiaKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
+  const nimKeys = getNimApiKeyPool();
+  const nvidiaKey = nimKeys[0];
   const groqKey = process.env.GROQ_API_KEY;
 
   const providers: ProviderConfig[] = [];
   if (nvidiaKey) {
-    const candidateModels = [
-      LOT_CODE_MODEL,
-      "meta/muse-glimmer-30b",
-      "nvidia/nemotron-3-ultra-550b-a55b",
-      "poolside/laguna-xs-2.1",
-      "minimaxai/minimax-m3.1-flash",
-      "google/gemma-4-31b-it",
-      "nvidia/nemotron-3.5-super-vl-120b-a12b",
-      "moonshotai/kimi-k3.1-pro",
-    ];
+    const candidateModels = [LOT_CODE_MODEL, ...LOT_CODING_MODELS];
 
     for (const model of candidateModels) {
       if (!providers.some((p) => p.model === model)) {

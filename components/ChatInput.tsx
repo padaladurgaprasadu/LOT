@@ -379,27 +379,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      {/* Clean Solid Matte Input Container */}
-      <div className="relative flex flex-col bg-[#111114] border border-[#27272a] focus-within:border-zinc-500 rounded-2xl px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-xl transition-colors duration-150">
-        {/* Row 1 (Internal): Live Audio Recording Waveform Visualizer */}
+      {/* Clean Flat Input Container (No glowing shadows) */}
+      <div className="relative flex flex-col bg-[#111114] border border-zinc-800 focus-within:border-zinc-500 rounded-2xl px-2.5 sm:px-3.5 py-2 sm:py-2.5 transition-colors duration-150">
+        {/* Row 1 (Internal): Clean Listening Status */}
         {isListening && (
-          <div className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-red-950/40 border border-red-500/30 rounded-xl mb-1.5 animate-in fade-in">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
-            <span className="text-xs font-medium text-red-300 truncate">
+          <div className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-red-950/30 border border-red-800/50 rounded-xl mb-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+            <span className="text-xs font-medium text-red-200 truncate">
               Listening to voice... speak freely
             </span>
-            <div className="flex items-center gap-1 ml-1 shrink-0">
-              <span className="w-1 h-2.5 bg-red-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <span className="w-1 h-4 bg-red-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <span className="w-1 h-5 bg-red-400 rounded-full animate-bounce" />
-              <span className="w-1 h-3.5 bg-red-400 rounded-full animate-bounce [animation-delay:-0.2s]" />
-              <span className="w-1 h-2 bg-red-400 rounded-full animate-bounce [animation-delay:-0.35s]" />
-            </div>
             <div className="flex-1" />
             <button
               type="button"
               onClick={toggleSpeechRecognition}
-              className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-red-500/40 hover:bg-red-500/60 text-red-100 border border-red-500/50 transition active:scale-95 shrink-0"
+              className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-red-900/50 hover:bg-red-800/60 text-red-100 border border-red-700/60 transition-colors shrink-0"
             >
               Finish Speaking
             </button>
@@ -408,10 +401,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Row 3 (Internal): Transcribing Indicator */}
         {isTranscribing && (
-          <div className="w-full flex items-center gap-2 px-2.5 py-1 bg-amber-950/40 border border-amber-500/30 rounded-xl mb-1.5 animate-in fade-in">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span className="text-xs font-medium text-amber-200">
-              ✨ Whisper is transcribing your audio...
+          <div className="w-full flex items-center gap-2 px-2.5 py-1 bg-zinc-900 border border-zinc-700 rounded-xl mb-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-200">
+              Whisper is transcribing your audio...
             </span>
           </div>
         )}
@@ -431,7 +424,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {/* Plus Menu Popover */}
             {plusMenuOpen && (
-              <div className="absolute bottom-12 left-0 w-56 bg-[#141418] border border-[#27272a] rounded-2xl shadow-2xl py-1.5 z-50 animate-in fade-in duration-100 divide-y divide-zinc-800/60">
+              <div className="absolute bottom-12 left-0 w-56 bg-[#141418] border border-zinc-800 rounded-xl py-1.5 z-50 divide-y divide-zinc-800/80">
                 <div className="py-1">
                   <label className="flex items-center space-x-2.5 px-3.5 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#1c1c21] cursor-pointer transition-colors">
                     <Paperclip className="w-3.5 h-3.5 text-zinc-300" />
@@ -647,11 +640,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           {/* Live Web Search Toggle */}
           <button
             type="button"
+            aria-pressed={forceWebSearch}
             onClick={() => setForceWebSearch((prev) => !prev)}
-            className={`px-2 py-1 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1 active:scale-95 ${
+            className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors duration-150 flex items-center gap-1 ${
               forceWebSearch
-                ? "bg-blue-600/30 text-blue-300 border border-blue-500/50 shadow-sm"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                ? "bg-zinc-800 text-white border border-zinc-600"
+                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60 border border-transparent"
             }`}
             title={forceWebSearch ? "Live Web Search Active" : "Toggle Live Web Search"}
           >
@@ -662,11 +656,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           {/* Deep Research Toggle */}
           <button
             type="button"
+            aria-pressed={deepResearch}
             onClick={() => setDeepResearch((prev) => !prev)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1 active:scale-95 ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors duration-150 flex items-center gap-1 ${
               deepResearch
-                ? "bg-white text-black font-semibold shadow-md"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                ? "bg-white text-black font-semibold border border-white"
+                : "text-zinc-400 hover:text-white hover:bg-zinc-800/60 border border-transparent"
             }`}
             title={deepResearch ? "Deep Research Mode Enabled" : "Enable Multi-Round Deep Research"}
           >
@@ -678,9 +673,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <button
             type="button"
             onClick={toggleSpeechRecognition}
-            className={`p-1.5 rounded-lg transition-all duration-150 active:scale-95 ${
+            className={`p-1.5 rounded-lg transition-colors duration-150 ${
               isListening
-                ? "bg-red-600 text-white shadow-lg shadow-red-600/40 animate-pulse ring-2 ring-red-400/50 scale-105"
+                ? "bg-red-700 text-white border border-red-500"
                 : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
             }`}
             title={isListening ? "Stop listening" : "Voice Input (Continuous)"}
@@ -693,7 +688,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="button"
               onClick={onStopGeneration}
-              className="p-1.5 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors active:scale-95"
+              className="p-1.5 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors"
               title="Stop generating"
             >
               <Square className="w-4 h-4 fill-current" />
@@ -703,9 +698,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={!input.trim() && !attachment}
-              className={`p-1.5 rounded-lg transition-all duration-150 active:scale-95 ${
+              className={`p-1.5 rounded-lg transition-colors duration-150 ${
                 input.trim() || attachment
-                  ? "bg-white text-black hover:bg-zinc-200 shadow-md"
+                  ? "bg-white text-black hover:bg-zinc-200"
                   : "text-zinc-600 cursor-not-allowed bg-transparent"
               }`}
               title="Send prompt"

@@ -118,7 +118,7 @@ export const PROVIDER_CONFIGS: Record<ProviderName, ProviderConfig> = {
   nvidia: {
     name: "nvidia",
     envKey: "NVIDIA_API_KEY",
-    defaultModel: "moonshotai/kimi-k3.1-pro",
+    defaultModel: "nvidia/nemotron-3.5-lightning-30b-a3b",
     hostname: "integrate.api.nvidia.com",
     path: "/v1/chat/completions",
     port: 443,
@@ -128,7 +128,7 @@ export const PROVIDER_CONFIGS: Record<ProviderName, ProviderConfig> = {
       Connection: "keep-alive",
     }),
     buildBody: (model, messages, stream) => ({
-      model: model || "moonshotai/kimi-k3.1-pro",
+      model: model || "nvidia/nemotron-3.5-lightning-30b-a3b",
       messages,
       temperature: 0.3,
       max_tokens: 4096,

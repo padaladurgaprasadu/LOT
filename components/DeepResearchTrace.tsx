@@ -60,25 +60,23 @@ export function DeepResearchTrace({
   };
 
   return (
-    <div className="w-full mb-4 rounded-2xl border border-zinc-800 bg-[#0e0e12] text-xs text-zinc-300 overflow-hidden shadow-xl animate-in fade-in duration-150">
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-zinc-900/60 border-b border-zinc-800/80">
+    <div className="w-full mb-4 rounded-xl border border-zinc-800 bg-[#111114] text-xs text-zinc-300 overflow-hidden animate-in fade-in duration-150">
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#16161a] border-b border-zinc-800">
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-2.5 text-left flex-1 min-w-0 group cursor-pointer"
         >
           <span
-            className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-              isStreaming
-                ? "bg-blue-400 animate-ping"
-                : "bg-emerald-400"
+            className={`h-2 w-2 rounded-full shrink-0 ${
+              isStreaming ? "bg-blue-400" : "bg-emerald-500"
             }`}
           />
           <div className="flex items-center gap-2 truncate">
             <span className="font-semibold text-zinc-100 truncate text-xs">
               {isStreaming ? latest.label : `Deep Research complete (${steps.length} stages)`}
             </span>
-            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/20 shrink-0">
+            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 shrink-0">
               {isStreaming ? "Researching" : "Verified"}
             </span>
           </div>
@@ -91,7 +89,7 @@ export function DeepResearchTrace({
           <button
             type="button"
             onClick={downloadReport}
-            className="ml-3 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-200 transition flex items-center gap-1.5 shrink-0 shadow-sm"
+            className="ml-3 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-200 transition-colors flex items-center gap-1.5 shrink-0"
             title="Download report as Markdown"
           >
             <Download className="w-3.5 h-3.5 text-zinc-300" />

@@ -1,6 +1,7 @@
 // components/cleanModelOutput.ts
 import { SourceItem } from "./LiveSourceCards";
 import { DeepStep } from "./DeepResearchTrace";
+import { canonicalizeUrl, isSafePublicUrl } from "@/lib/intelligence/policyGuard";
 
 // Blocklist for coding, tutorials, grammar, math, and conversational queries
 const NON_VISUAL_QUERY_REGEX =
@@ -65,12 +66,22 @@ export function cleanModelOutput(
     if (sourcesMatch) {
       try {
         const parsed = JSON.parse(sourcesMatch[1]);
-        if (Array.isArray(parsed)) {
-          liveSources = parsed;
-        } else if (parsed && typeof parsed === "object") {
-          liveSources = parsed.sources || [];
+        const rawList: SourceItem[] = Array.isArray(parsed)
+          ? parsed
+          : parsed && typeof parsed === "object"
+          ? parsed.sources || []
+          : [];
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           searchQueries = parsed.queries || [];
         }
+        const seen = new Set<string>();
+        liveSources = rawList.filter((s) => {
+          if (!s?.url || !isSafePublicUrl(s.url)) return false;
+          const canon = canonicalizeUrl(s.url);
+          if (seen.has(canon)) return false;
+          seen.add(canon);
+          return true;
+        });
       } catch {}
       text = text.replace(sourcesMatch[0], "");
     }
@@ -117,7 +128,8 @@ export function cleanModelOutput(
     }
 
     text = text.replace(/\[FOLLOWUPS:[\s\S]*$/i, "").trim();
-    text = text.replace(/^([A-Za-z0-9][^\n*]{1,60})\*\*/m, "**$1**");
+    // Fix unclosed "**Heading:" lines
+    text = text.replace(/^(\s*(?:[-*]|\d+\.)?\s*)\*\*([^*\n]{2,80}:)(?!\*\*)/gm, "$1**$2**");
 
     return {
       heroEntity,

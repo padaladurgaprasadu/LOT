@@ -1,5 +1,7 @@
 // lib/queryRewriter.ts
 import OpenAI from 'openai';
+import { VERIFIED_NIM_MODELS } from './intelligence/nimCatalog';
+import { normalizeIndicText } from './intelligence/policyGuard';
 
 export interface RewrittenSearchPlan {
   needsSearch: boolean;
@@ -35,9 +37,20 @@ export async function rewriteSearchQuery(params: {
   forceWebSearch?: boolean;
 }): Promise<RewrittenSearchPlan> {
   const { client, messages, forceWebSearch = false } = params;
-  const lastMessage = String(messages[messages.length - 1]?.content || '').trim();
+  const lastMessage = normalizeIndicText(String(messages[messages.length - 1]?.content || ''));
 
   if (!lastMessage) {
+    return { needsSearch: false, queries: [], topic: 'general' };
+  }
+
+  // Never trigger accidental web search on explicit coding/debug prompts unless Web toggle is forced
+  const isExplicitCodingPrompt =
+    /^\[(Coder Mode|Debug & Self-Heal|AUTONOMOUS SELF-HEAL)\]/i.test(lastMessage) ||
+    /```[\s\S]*```/.test(lastMessage) ||
+    /\b(typescript|javascript|python|react|rust|golang|sql)\s+(function|class|component|script|interface|type)\b/i.test(
+      lastMessage
+    );
+  if (!forceWebSearch && isExplicitCodingPrompt) {
     return { needsSearch: false, queries: [], topic: 'general' };
   }
 
@@ -50,12 +63,30 @@ export async function rewriteSearchQuery(params: {
     return { needsSearch: false, queries: [], topic: 'general' };
   }
 
-  // FAST PATH 2: Turn-1 clean query (no pronouns to resolve) -> 0ms direct search
+  // FAST PATH 2: Turn-1 clean query (no pronouns to resolve) -> 0ms localized search
   if (!hasHistory && looksLikeLiveQuery && lastMessage.length <= 90) {
+    const isTicker = /\b(price|rate|weather|score|stock|gold|silver|petrol|diesel|btc|usd|inr|nifty|sensex)\b/i.test(
+      lastMessage
+    );
+    const todayDate = new Date().toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    let queries = [lastMessage];
+    if (/\b(gold|silver)\b/i.test(lastMessage) && /\b(rate|price|today|cost)\b/i.test(lastMessage)) {
+      queries = [
+        `${lastMessage} India 24K 22K 18K per 10 grams INR ${todayDate}`,
+        `today gold rate Hyderabad Vijayawada Andhra Pradesh 22K 24K ${todayDate}`,
+      ];
+    } else if (isTicker) {
+      queries = [`${lastMessage} India ${todayDate}`];
+    }
     return {
       needsSearch: true,
-      queries: [lastMessage],
-      topic: /\b(price|rate|weather|score|stock|gold|btc)\b/i.test(lastMessage)
+      queries,
+      topic: isTicker
         ? 'live_ticker'
         : /\b(news|breaking|announced|launched|won)\b/i.test(lastMessage)
         ? 'news'
@@ -92,10 +123,10 @@ ${recentHistory || 'None'}
 [LATEST USER MESSAGE]:
 ${lastMessage}`;
 
-  // Try ultra-fast 3B model first, fallback to 8B, hard cap at 1.5s
+  // Use fast verified NIM Lightning model with 2s cap (avoid retired 3b/8b endpoints)
   const fastModels = [
-    'meta/llama-3.2-3b-instruct',
-    'meta/llama-3.1-8b-instruct',
+    VERIFIED_NIM_MODELS.EVERYDAY_FAST,
+    VERIFIED_NIM_MODELS.TOOLS_MULTIMODAL,
   ];
 
   for (const model of fastModels) {

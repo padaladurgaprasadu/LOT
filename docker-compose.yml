@@ -1,33 +1,6 @@
 version: '3.8'
 
 services:
-  # LiteLLM Multi-Key Gateway & Flagship Model Matrix Proxy
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: lot-litellm-gateway
-    restart: unless-stopped
-    ports:
-      - "${LITELLM_PORT:-4000}:4000"
-    volumes:
-      - ./infra/litellm/litellm_config.yaml:/app/config.yaml:ro
-      - ./infra/litellm/nim_guardrail_hook.py:/app/nim_guardrail_hook.py:ro
-    environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-lot-master-admin-key-flagship-mesh}
-      - NVIDIA_NIM_API_KEY_1=${NVIDIA_NIM_API_KEY_1:-}
-      - NVIDIA_NIM_API_KEY_2=${NVIDIA_NIM_API_KEY_2:-}
-      - NVIDIA_NIM_API_KEY_3=${NVIDIA_NIM_API_KEY_3:-}
-      - NVIDIA_NIM_API_KEY_4=${NVIDIA_NIM_API_KEY_4:-}
-      - NVIDIA_NIM_API_KEY_5=${NVIDIA_NIM_API_KEY_5:-}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - lot-network
-
   # Qdrant 4096-Dimensional Vector & Graph Memory Storage
   qdrant:
     image: qdrant/qdrant:latest
@@ -97,8 +70,13 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
       - PORT=8000
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-lot-master-admin-key-flagship-mesh}
+      - NVIDIA_NIM_BASE_URL=${NVIDIA_NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NVIDIA_NIM_API_KEY_1=${NVIDIA_NIM_API_KEY_1:-}
+      - NVIDIA_NIM_API_KEY_2=${NVIDIA_NIM_API_KEY_2:-}
+      - NVIDIA_NIM_API_KEY_3=${NVIDIA_NIM_API_KEY_3:-}
+      - NVIDIA_NIM_API_KEY_4=${NVIDIA_NIM_API_KEY_4:-}
+      - NVIDIA_NIM_API_KEY_5=${NVIDIA_NIM_API_KEY_5:-}
       - QDRANT_HOST=http://qdrant:6333
       - QDRANT_API_KEY=${QDRANT_API_KEY:-lot-qdrant-secure-local-key}
       - REDIS_URL=redis://redis:6379/0
@@ -107,7 +85,6 @@ services:
       - HIGGSFIELD_BASE_URL=${HIGGSFIELD_BASE_URL:-https://api.higgsfield.ai}
       - LOT_AFFILIATE_TAG=${LOT_AFFILIATE_TAG:-?ref=LOT_AIOS_AFFILIATE}
     depends_on:
-      - litellm
       - qdrant
       - redis
       - searxng

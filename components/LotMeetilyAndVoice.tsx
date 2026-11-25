@@ -19,6 +19,7 @@ export function LotMeetilyAndVoice({
   const [meetingTranscript, setMeetingTranscript] = useState<string>('');
   const [meetingMinutes, setMeetingMinutes] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [meetingNotice, setMeetingNotice] = useState<string | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -73,8 +74,13 @@ export function LotMeetilyAndVoice({
   // 2. MEETILY: CAPTURE GOOGLE MEET / ZOOM TAB + MIC & GENERATE MINUTES DOCUMENT
   const startMeetingCapture = async () => {
     if (typeof window === 'undefined') return;
+    setMeetingNotice(null);
 
     try {
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        setMeetingNotice('Screen/tab audio capture requires HTTPS or localhost with browser permissions.');
+        return;
+      }
       // Captures Google Meet / Zoom browser tab audio + user microphone
       const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
@@ -111,6 +117,7 @@ export function LotMeetilyAndVoice({
       setMeetingMinutes(null);
     } catch (err) {
       console.warn('Meeting capture cancelled or unsupported:', err);
+      setMeetingNotice('Meetily ready: select a Meet/Zoom tab with audio sharing enabled to start recording.');
     }
   };
 
@@ -171,19 +178,42 @@ export function LotMeetilyAndVoice({
     URL.revokeObjectURL(url);
   };
 
-  // Only render when meeting recording is active, summarizing, or minutes doc is ready
-  if (!isMeetingActive && !meetingMinutes && !isSummarizing) {
+  // Only render when meeting recording is active, summarizing, notice shown, or minutes doc is ready
+  if (!isMeetingActive && !meetingMinutes && !isSummarizing && !meetingNotice) {
     return null;
   }
 
   return (
     <div className="w-full max-w-3xl mx-auto mb-3 animate-in fade-in duration-150">
+      {meetingNotice && !isMeetingActive && (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-[#111114] px-3.5 py-2 text-xs mb-2 text-zinc-300">
+          <span>{meetingNotice}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={startMeetingCapture}
+              className="rounded-md border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 text-[11px] text-white transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => setMeetingNotice(null)}
+              className="px-1.5 py-0.5 text-zinc-400 hover:text-white rounded"
+              aria-label="Dismiss Meetily notice"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Active Meetily Recording HUD */}
       {isMeetingActive && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-800/80 bg-neutral-950 px-3.5 py-2 text-xs mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-700 bg-[#111114] px-3.5 py-2 text-xs mb-2">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-            <span className="font-semibold text-emerald-400">📹 Meetily: Recording Active (Meet / Zoom)</span>
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            <span className="font-semibold text-emerald-400">Meetily: Recording Active (Meet / Zoom)</span>
           </div>
 
           <button

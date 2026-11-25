@@ -46,6 +46,20 @@ import { buildInfiniteContext } from "@/lib/contextManager";
 import { planAgentSwarmPipeline, LOT_DOMAIN_AGENTS } from "@/lib/lotSwarmOrchestrator";
 import { executeInstantWebSearch, LiveSource } from "@/lib/liveWebSearch";
 import { rewriteSearchQuery } from "@/lib/queryRewriter";
+import { extractDeepPages } from "@/lib/deepExtractor";
+import {
+  NIM_CODING_CANDIDATES,
+  NIM_DEEP_CANDIDATES,
+  NIM_EVERYDAY_CANDIDATES,
+  VERIFIED_NIM_MODELS,
+  getNimApiKeyPool,
+} from "@/lib/intelligence/nimCatalog";
+import {
+  normalizeIndicText,
+  preRerankSources,
+  sanitizeUntrustedWebText,
+  verifyAndDeduplicateSources,
+} from "@/lib/intelligence/policyGuard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -180,15 +194,16 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
 
-    // 3. Intent Classification
+    // 3. Intent Classification (with NFKC Indic/Hinglish normalization)
     const rawMessages: Array<{ role: string; content: string }> = body.messages;
     const lastUserMsg = [...rawMessages].reverse().find((m) => m.role === "user")?.content || "";
-    const query = typeof lastUserMsg === "string" ? lastUserMsg.trim() : "";
+    const query = typeof lastUserMsg === "string" ? normalizeIndicText(lastUserMsg) : "";
     const mode = typeof body.mode === "string" ? body.mode : undefined;
 
     const intentClassification: IntentClassification = classifyQueryIntent(query, mode);
 
-    const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
+    const nimPool = getNimApiKeyPool();
+    const apiKey = nimPool[0];
     const openaiClient = apiKey
       ? new OpenAI({
           baseURL: "https://integrate.api.nvidia.com/v1",
@@ -203,12 +218,24 @@ export async function POST(req: Request): Promise<Response> {
       timeStyle: "short",
     });
 
-    // 4. Autonomous Conversational Query Rewriter & Parallel Live Web Search
+    // 4. Fast 0ms Live IST Clock Check for India / Andhra Pradesh time queries
+    const isIndiaTimeQuery =
+      /^(what('?s| is)?\s+(the\s+)?)?(current\s+)?(time(\s+now)?|date(\s+today)?|today('?s)?\s+date)(\s+(in|at)\s+(india|ist|andhra\s+pradesh|ap|telangana|hyderabad|vijayawada|visakhapatnam|tirupati))?[\s!?.]*$/i.test(
+        query
+      );
+
+    // Autonomous Conversational Query Rewriter & Parallel Live Web Search
     let liveSources: LiveSource[] = [];
     let rewrittenQueries: string[] = [];
     const forceWebSearch = body.forceWebSearch === true || body.enableGrounding === true;
+    const isCodeModeNoSearch =
+      !forceWebSearch &&
+      (/^\[(Coder Mode|Debug & Self-Heal|AUTONOMOUS SELF-HEAL)\]/i.test(query) ||
+        intentClassification.intent === "APP_PREVIEW" ||
+        intentClassification.intent === "PCB_HARDWARE" ||
+        intentClassification.intent === "PYTHON_WASM");
 
-    if (query) {
+    if (query && !isIndiaTimeQuery && !isCodeModeNoSearch) {
       try {
         const rewritePlan = await rewriteSearchQuery({
           client: openaiClient,
@@ -222,14 +249,38 @@ export async function POST(req: Request): Promise<Response> {
             rewritePlan.queries.map((q) => executeInstantWebSearch(q))
           );
 
-          const seenUrls = new Set<string>();
+          const rawCollected: LiveSource[] = [];
           for (const out of searchOutputs) {
             for (const src of out.sources) {
-              if (!seenUrls.has(src.url) && liveSources.length < 8) {
-                seenUrls.add(src.url);
-                liveSources.push(src);
-              }
+              rawCollected.push({
+                ...src,
+                snippet: sanitizeUntrustedWebText(src.snippet),
+              });
             }
+          }
+          // Strictly deduplicate, pre-rerank, and live-verify HTTP 200-399 / reachable sources
+          liveSources = await verifyAndDeduplicateSources(query, rawCollected, 5);
+
+          // Enrich live rate/ticker/price queries with full extracted tables from top 3 verified URLs
+          if (
+            liveSources.length > 0 &&
+            (rewritePlan.topic === "live_ticker" ||
+              /\b(gold|silver|rate|price|petrol|diesel|nifty|sensex|usd|inr|weather)\b/i.test(query))
+          ) {
+            try {
+              const extracted = await Promise.race([
+                extractDeepPages(
+                  liveSources.slice(0, 3).map((s) => s.url),
+                  query
+                ),
+                new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 4500)),
+              ]);
+              const extractedMap = new Map(extracted.map((p) => [p.url, p.content]));
+              liveSources = liveSources.map((s) => {
+                const full = extractedMap.get(s.url);
+                return full ? { ...s, snippet: `${s.snippet}\n\n[Extracted Page Details]:\n${full}`.slice(0, 2600) } : s;
+              });
+            } catch {}
           }
         }
       } catch (searchErr) {
@@ -239,7 +290,10 @@ export async function POST(req: Request): Promise<Response> {
 
     // Fallback to legacy performWebGrounding if no live sources but shouldGround is set
     let searchResults: WebSearchResult[] = [];
-    const shouldGround = intentClassification.requiresWebSearch || forceWebSearch;
+    const shouldGround =
+      !isIndiaTimeQuery &&
+      !isCodeModeNoSearch &&
+      (intentClassification.requiresWebSearch || forceWebSearch);
     if (liveSources.length === 0 && shouldGround && query) {
       try {
         searchResults = await performWebGrounding(query);
@@ -267,8 +321,9 @@ Follow these strict rules in every response:
    - Never put punctuation (dots, commas, brackets) immediately touching a raw URL.
    - If no Verified URL is available in context, only mention well-known main domains (like https://github.com or https://react.dev) without deep paths.
 
-3. CONCISE & ACCURATE:
+3. CONCISE, ACCURATE & ENGLISH-ONLY:
    - Keep answers sharp, factual, and strictly grounded in real-world knowledge.
+   - Always respond strictly in clean, fluent English. Never use non-English scripts or transliterated regional-language prose.
 
 4. HERO IMAGE RULE (STRICT):
    - ONLY if the user is specifically asking about a real-world geographical PLACE (city, temple, state, country), a famous PERSON, a physical MONUMENT/LANDMARK, an ANIMAL, or a FOOD DISH, output \`[HERO: PLACE | Canonical Name]\` (or \`PERSON\`, \`MONUMENT\`, \`ANIMAL\`, \`DISH\`) on the very first line (e.g. \`[HERO: PLACE | Tirupati]\`, \`[HERO: PERSON | A. P. J. Abdul Kalam]\`).
@@ -309,11 +364,12 @@ Follow these strict rules in every response:
       groundingSystemContent = `\n\n[LIVE REAL-TIME WEB GROUNDING DATA - FETCHED RIGHT NOW (${currentDateTime})]:
 ${liveSnippet}
 
-STRICT CITATION RULES:
+STRICT CITATION & ACCURACY RULES:
 1. Treat the live search context above as the primary source of truth over your training memory.
-2. Cite facts inline using exact numbered Markdown links like [[1]](exact-url) or [Source Name](exact-url).
-3. NEVER invent, modify, or hallucinate URLs. Only use exact URLs from the search results above.
-4. Prioritize the most recent timestamps when multiple sources provide conflicting information.`;
+2. When answering live rates, prices, or financial queries (such as gold/silver rates, taxes, or RBI figures), present exact figures with clear units (e.g., 24K, 22K, 18K per 1 gram and 10 grams in ₹ INR), city/regional rates if available in the sources, and a clean Markdown table.
+3. Cite facts inline using exact numbered Markdown links like [[1]](exact-url) or [Source Name](exact-url).
+4. NEVER invent, modify, or hallucinate URLs or prices. Only use exact URLs and numbers from the search results above; if a figure differs across sources, show the source-attributed range and date.
+5. Prioritize the most recent timestamps when multiple sources provide conflicting information.`;
     } else if (searchResults && searchResults.length > 0) {
       const groundingSnippet = searchResults
         .map(
@@ -343,25 +399,55 @@ STRICT CITATION RULES:
     // Fast-path: True Instant SSE Stream with Zero 45-second Buffering
     if (isStreaming) {
       const rawModel = body.model || body.modelOverride || "";
-      const preferredModel =
-        rawModel && rawModel !== "meta/llama-3.3-70b-instruct" && rawModel !== "meta/llama-3.1-8b-instruct"
-          ? rawModel
-          : "nvidia/nemotron-3-ultra-550b-a55b";
+      const isCodingIntent =
+        intentClassification.intent === "APP_PREVIEW" ||
+        intentClassification.intent === "PCB_HARDWARE" ||
+        intentClassification.intent === "PYTHON_WASM";
+      const isDeepIntent =
+        intentClassification.intent === "ACADEMIC_RESEARCH" ||
+        liveSources.length > 0 ||
+        body.deepResearch === true;
+
+      const modeCandidates = isCodingIntent
+        ? NIM_CODING_CANDIDATES
+        : isDeepIntent
+        ? NIM_DEEP_CANDIDATES
+        : NIM_EVERYDAY_CANDIDATES;
+
+      const deprecatedAliases = new Set([
+        "meta/llama-3.3-70b-instruct",
+        "meta/llama-3.1-8b-instruct",
+        "google/gemma-4-31b-it",
+        "moonshotai/kimi-k3.1-pro",
+        "nvidia/nemotron-3-ultra-550b-a55b",
+      ]);
+
+      const preferredModel = isIndiaTimeQuery
+        ? "LOT Server Clock (IST)"
+        : rawModel && !deprecatedAliases.has(rawModel)
+        ? rawModel
+        : modeCandidates[0];
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream({
         async start(controller) {
           try {
+            const uiSources = (liveSources || []).map((s) => ({
+              title: s.title,
+              url: s.url,
+              domain: s.domain,
+              publishedDate: s.publishedDate,
+              snippet: (s.snippet || "").slice(0, 260),
+            }));
+
             // 1. Emit metadata immediately (browser receives first packet in < 10ms)
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "metadata",
                   intent: intentClassification.intent,
-                  model: preferredModel,
-                  provider: "nvidia",
                   searchResults: searchResults || [],
-                  sources: liveSources || [],
+                  sources: uiSources,
                   queries: rewrittenQueries || [],
                   summary: updatedSummary,
                 })}\n\n`
@@ -369,7 +455,7 @@ STRICT CITATION RULES:
             );
 
             // 2. Stream verified live source cards to UI immediately before model starts typing
-            if (liveSources.length > 0) {
+            if (uiSources.length > 0) {
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
@@ -378,7 +464,7 @@ STRICT CITATION RULES:
                         delta: {
                           content: `[LOT_SOURCES]${JSON.stringify({
                             queries: rewrittenQueries,
-                            sources: liveSources,
+                            sources: uiSources,
                           })}[/LOT_SOURCES]\n`,
                         },
                       },
@@ -390,7 +476,35 @@ STRICT CITATION RULES:
 
             let accumulatedContent = "";
 
-            if (isSimpleGreeting && (intentClassification.intent === "CHAT" || !mode || mode === "chat")) {
+            if (isIndiaTimeQuery) {
+              const nowIst = new Date();
+              const istTime = nowIst.toLocaleTimeString("en-IN", {
+                timeZone: "Asia/Kolkata",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+              });
+              const istDate = nowIst.toLocaleDateString("en-IN", {
+                timeZone: "Asia/Kolkata",
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              });
+              const timeAnswer = `The current time in **Andhra Pradesh (IST, UTC+5:30)** is **${istTime}**.\n\n- **Date**: ${istDate}\n- **Time Zone**: Indian Standard Time (Asia/Kolkata, UTC+05:30)`;
+              const tokens = timeAnswer.match(/\S+\s*/g) || [timeAnswer];
+              for (const t of tokens) {
+                accumulatedContent += t;
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      choices: [{ delta: { content: t } }],
+                    })}\n\n`
+                  )
+                );
+              }
+            } else if (isSimpleGreeting && (intentClassification.intent === "CHAT" || !mode || mode === "chat")) {
               const greetingText = "Hello! I am LOT, your autonomous AI and agentic coding OS. How can I help you today? You can ask me to write code, design circuits, inspect research papers, or automate workflows.";
               const words = greetingText.split(" ");
               for (const word of words) {
@@ -406,16 +520,10 @@ STRICT CITATION RULES:
                 await new Promise((r) => setTimeout(r, 20));
               }
             } else {
-              // Direct NVIDIA NIM Real-Time Streaming with Ultra-Fast Candidate Failover
-              const apiKey = process.env.NVIDIA_API_KEY || process.env.LOT_BACKEND_KEY;
-              const candidates = [
-                preferredModel,
-                "nvidia/nemotron-3-ultra-550b-a55b",
-                "minimaxai/minimax-m3.1-flash",
-                "meta/muse-glimmer-30b",
-                "google/gemma-4-31b-it",
-                "moonshotai/kimi-k3.1-pro",
-              ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
+              // Direct NVIDIA NIM Real-Time Streaming with Verified Candidate Failover
+              const candidates = [preferredModel, ...modeCandidates].filter(
+                (v, i, a) => Boolean(v) && a.indexOf(v) === i
+              );
 
               let streamStarted = false;
 
@@ -426,7 +534,7 @@ STRICT CITATION RULES:
                   let timeoutId: NodeJS.Timeout | null = null;
                   try {
                     const nimController = new AbortController();
-                    const timeoutDuration = i === 0 ? 7000 : 4000;
+                    const timeoutDuration = i === 0 ? 11000 : 6000;
                     timeoutId = setTimeout(() => {
                       if (!streamStarted) {
                         console.warn(`[LOT CHAT] Candidate ${candidate} queued > ${timeoutDuration}ms. Auto-switching to fast fallback...`);
@@ -443,7 +551,12 @@ STRICT CITATION RULES:
                       body: JSON.stringify({
                         model: candidate,
                         messages: modelMessages,
-                        temperature: typeof body.temperature === "number" ? body.temperature : 0.3,
+                        temperature:
+                          typeof body.temperature === "number"
+                            ? body.temperature
+                            : liveSources.length > 0
+                            ? 0.1
+                            : 0.3,
                         max_tokens: typeof body.maxTokens === "number" ? body.maxTokens : 4096,
                         stream: true,
                       }),

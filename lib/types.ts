@@ -23,6 +23,7 @@ export interface Message {
   reasoning?: string;
   timestamp: number;
   model?: string;
+  modeLabel?: string;
   heroImage?: EntityHeroData;
   attachment?: Attachment;
   followUps?: string[];

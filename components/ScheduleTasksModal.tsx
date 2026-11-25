@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, CalendarClock, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
 import { ScheduledTask } from "@/lib/types";
 import { LOT_MODELS, DEFAULT_MODEL_ID } from "@/lib/nvidia";
@@ -31,6 +31,15 @@ export const ScheduleTasksModal: React.FC<ScheduleTasksModalProps> = ({
   const [cronOrTime, setCronOrTime] = useState("09:00 AM");
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleCreate = (e: React.FormEvent) => {
@@ -56,8 +65,13 @@ export const ScheduleTasksModal: React.FC<ScheduleTasksModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-xl bg-[#0e0e10] border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative w-full max-w-xl bg-[#111114] border border-zinc-800 rounded-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-850 bg-zinc-900/30">
           <div className="flex items-center space-x-3">
