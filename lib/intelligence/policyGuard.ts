@@ -175,35 +175,38 @@ export function preRerankSources<
   const nowMs = Date.now();
 
   const qTokens = Array.from(new Set(tokenizeIndicAware(query)));
-  const scored = uniqueSafe.map((src, idx) => {
-    const rawText = `${src.title || ""} ${src.snippet || ""}`;
-    const docTokens = new Set(tokenizeIndicAware(rawText));
-    let hits = 0;
-    for (const qt of qTokens) {
-      if (docTokens.has(qt)) hits += 1;
-    }
-    let score = qTokens.length > 0 ? hits / qTokens.length : 0;
-
-    if (isFreshQuery && src.publishedDate) {
-      const parsedMs = Date.parse(src.publishedDate);
-      if (!Number.isNaN(parsedMs)) {
-        const ageDays = (nowMs - parsedMs) / (1000 * 60 * 60 * 24);
-        if (ageDays <= 3) score += 0.35;
-        else if (ageDays > 30) score -= 0.45;
+  const scored = uniqueSafe
+    .map((src, idx) => {
+      const rawText = `${src.title || ""} ${src.snippet || ""}`;
+      const docTokens = new Set(tokenizeIndicAware(rawText));
+      let hits = 0;
+      for (const qt of qTokens) {
+        if (docTokens.has(qt)) hits += 1;
       }
-    }
+      let score = qTokens.length > 0 ? hits / qTokens.length : 0;
 
-    if (isIndiaQuery) {
-      if (/(\u20b9|rs\.?\s*\d|inr|india|andhra|hyderabad|vijayawada|per\s*10\s*g|24k|22k)/i.test(rawText)) {
-        score += 0.25;
+      if (isFreshQuery && src.publishedDate) {
+        const parsedMs = Date.parse(src.publishedDate);
+        if (!Number.isNaN(parsedMs)) {
+          const ageDays = (nowMs - parsedMs) / (1000 * 60 * 60 * 24);
+          if (ageDays <= 3) score += 0.35;
+          else if (ageDays > 30) score -= 0.45;
+        }
       }
-      if (/\b(us\s+gold|washington|california|texas|los\s+angeles)\b/i.test(rawText) && !/\bindia\b/i.test(rawText)) {
-        score -= 0.35;
-      }
-    }
 
-    return { src, score, idx };
-  });
+      if (isIndiaQuery) {
+        if (/(\u20b9|rs\.?\s*\d|inr|india|andhra|hyderabad|vijayawada|per\s*10\s*g|24k|22k)/i.test(rawText)) {
+          score += 0.25;
+        }
+        if (/\b(us\s+gold|washington|california|texas|los\s+angeles)\b/i.test(rawText) && !/\bindia\b/i.test(rawText)) {
+          score -= 0.35;
+        }
+      }
+
+      return { src, score, hits, idx };
+    })
+    // Drop completely off-topic results (0 query token hits) when query has >= 2 distinct terms
+    .filter((item) => qTokens.length < 2 || item.hits > 0);
 
   scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.idx - b.idx));
 

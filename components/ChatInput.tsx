@@ -40,6 +40,9 @@ export interface ChatInputProps {
   onOpenLotCode?: () => void;
   onOpenBrowserAgent?: () => void;
   externalInput?: string;
+  editNonce?: number;
+  isEditing?: boolean;
+  onCancelEdit?: () => void;
   searchFocus?: IndustryFocus;
   onSearchFocusChange?: (focus: IndustryFocus) => void;
   activeMode?: string;
@@ -55,6 +58,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onOpenLotCode,
   onOpenBrowserAgent,
   externalInput,
+  editNonce = 0,
+  isEditing = false,
+  onCancelEdit,
   searchFocus = "all",
   onSearchFocusChange,
   activeMode = "chat",
@@ -79,7 +85,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Sync external input and focus
+  // Sync external input and focus (re-triggers reliably on repeated edits via editNonce)
   useEffect(() => {
     if (externalInput !== undefined && externalInput !== "") {
       setInput(externalInput);
@@ -89,7 +95,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         textareaRef.current.setSelectionRange(len, len);
       }
     }
-  }, [externalInput]);
+  }, [externalInput, editNonce]);
 
   // Clean auto-resize without layout repaint flashing (24px to 160px)
   useEffect(() => {
@@ -381,6 +387,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
       {/* Clean Flat Input Container (No glowing shadows) */}
       <div className="relative flex flex-col bg-[#111114] border border-zinc-800 focus-within:border-zinc-500 rounded-2xl px-2.5 sm:px-3.5 py-2 sm:py-2.5 transition-colors duration-150">
+        {isEditing && (
+          <div className="w-full flex items-center justify-between gap-2 px-2.5 py-1 bg-zinc-900 border border-zinc-700 rounded-lg mb-1.5 text-xs text-zinc-300">
+            <span>Editing prompt — sending replaces the previous reply</span>
+            <button
+              type="button"
+              onClick={() => {
+                setInput("");
+                onCancelEdit?.();
+              }}
+              className="text-[11px] font-medium text-zinc-400 hover:text-white px-2 py-0.5 rounded hover:bg-zinc-800 transition-colors shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {/* Row 1 (Internal): Clean Listening Status */}
         {isListening && (
           <div className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-red-950/30 border border-red-800/50 rounded-xl mb-1.5">

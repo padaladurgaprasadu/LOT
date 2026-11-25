@@ -252,8 +252,11 @@ export async function executeInstantWebSearch(query: string): Promise<SearchOutp
   let provider: SearchOutput['provider'] = 'none';
   const isTickerQuery = LIVE_TICKER_REGEX.test(query);
 
-  // For live tickers/rates (gold, prices, stocks), combine Tavily + Serper (India gl="in") in parallel
-  if (isTickerQuery) {
+  // Combine Tavily + Serper (India gl="in") in parallel when both keys exist for higher factual accuracy
+  const hasTavily = Boolean(process.env.TAVILY_API_KEY);
+  const hasSerper = Boolean(process.env.SERPER_API_KEY);
+
+  if (hasTavily && hasSerper) {
     const [tavilyRes, serperRes] = await Promise.allSettled([
       searchTavily(query),
       searchSerper(query),
@@ -266,18 +269,16 @@ export async function executeInstantWebSearch(query: string): Promise<SearchOutp
       rawSources.push(...tavilyRes.value);
       provider = provider === 'none' ? 'tavily' : provider;
     }
-  } else {
+  } else if (hasTavily) {
     try {
       rawSources = await searchTavily(query);
       if (rawSources.length > 0) provider = 'tavily';
     } catch {}
-
-    if (rawSources.length === 0) {
-      try {
-        rawSources = await searchSerper(query);
-        if (rawSources.length > 0) provider = 'serper';
-      } catch {}
-    }
+  } else if (hasSerper) {
+    try {
+      rawSources = await searchSerper(query);
+      if (rawSources.length > 0) provider = 'serper';
+    } catch {}
   }
 
   if (rawSources.length === 0) {

@@ -67,15 +67,16 @@ const rawSources = [
   { title: "Unrelated Blog", snippet: "Cooking pasta recipes", url: "https://pasta.example.org/pasta" },
   { title: "SSRF Leak", snippet: "RBI repo rate 2026", url: "http://127.0.0.1:8080/rbi" },
   { title: "RBI Monetary Policy 2026", snippet: "RBI repo rate and UPI limit circular 2026", url: "https://rbi.org.in/2026" },
-  { title: "Tech News", snippet: "Smartphones launch", url: "https://tech.example.net/phones" },
+  { title: "UPI News", snippet: "UPI transaction updates in India", url: "https://tech.example.net/upi" },
   { title: "NPCI UPI Circular", snippet: "UPI transaction limit updates 2026", url: "https://npci.org.in/upi-2026" },
-  { title: "Sports", snippet: "Cricket match schedule", url: "https://sports.example.com/cricket" },
+  { title: "RBI Policy Note", snippet: "2026 repo rate announcement", url: "https://policy.example.com/rbi" },
   { title: "Finance Summary", snippet: "Repo rate impact on EMI", url: "https://finance.example.in/emi" },
 ];
 const reranked = preRerankSources("RBI repo rate UPI limit 2026", rawSources, 5);
 assert.equal(reranked.length, 5);
 assert.equal(reranked[0].url, "https://rbi.org.in/2026");
 assert.ok(!reranked.some((s) => s.url.includes("127.0.0.1")), "SSRF URL must be filtered before scraping");
+assert.ok(!reranked.some((s) => s.url.includes("pasta.example.org")), "Off-topic zero-overlap URL must be dropped");
 
 // Per-domain cap prevents 3+ duplicate pages from the same domain flooding results
 const sameDomainSources = [
@@ -83,9 +84,11 @@ const sameDomainSources = [
   { title: "Gold 2", snippet: "Today gold rate India", url: "https://gold.example.in/2" },
   { title: "Gold 3", snippet: "Today gold rate India", url: "https://gold.example.in/3" },
   { title: "Gold Other", snippet: "Today gold rate India", url: "https://bullion.example.org/rate" },
+  { title: "Off Topic Tickets", snippet: "Concert tickets in London", url: "https://tickets.example.net/gig" },
 ];
 const capped = preRerankSources("today gold rate India", sameDomainSources, 5, 2);
 assert.equal(capped.length, 3);
+assert.ok(!capped.some((s) => s.url.includes("tickets.example.net")), "Zero-overlap off-topic source must be filtered");
 
 // 6. 80% Context Compaction & Secret Redaction
 const hugeMessages = Array.from({ length: 12 }, (_, idx) => ({

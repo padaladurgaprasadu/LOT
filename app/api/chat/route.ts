@@ -261,12 +261,8 @@ export async function POST(req: Request): Promise<Response> {
           // Strictly deduplicate, pre-rerank, and live-verify HTTP 200-399 / reachable sources
           liveSources = await verifyAndDeduplicateSources(query, rawCollected, 5);
 
-          // Enrich live rate/ticker/price queries with full extracted tables from top 3 verified URLs
-          if (
-            liveSources.length > 0 &&
-            (rewritePlan.topic === "live_ticker" ||
-              /\b(gold|silver|rate|price|petrol|diesel|nifty|sensex|usd|inr|weather)\b/i.test(query))
-          ) {
+          // Enrich top 3 grounded sources with clean full-page extraction so answers never rely on tiny snippets
+          if (liveSources.length > 0) {
             try {
               const extracted = await Promise.race([
                 extractDeepPages(
@@ -366,10 +362,11 @@ ${liveSnippet}
 
 STRICT CITATION & ACCURACY RULES:
 1. Treat the live search context above as the primary source of truth over your training memory.
-2. When answering live rates, prices, or financial queries (such as gold/silver rates, taxes, or RBI figures), present exact figures with clear units (e.g., 24K, 22K, 18K per 1 gram and 10 grams in ₹ INR), city/regional rates if available in the sources, and a clean Markdown table.
-3. Cite facts inline using exact numbered Markdown links like [[1]](exact-url) or [Source Name](exact-url).
-4. NEVER invent, modify, or hallucinate URLs or prices. Only use exact URLs and numbers from the search results above; if a figure differs across sources, show the source-attributed range and date.
-5. Prioritize the most recent timestamps when multiple sources provide conflicting information.`;
+2. Cross-verify numbers, dates, and entity names across the retrieved sources before stating them. Do NOT mix units (per gram vs per 10 grams, USD vs INR) or extrapolate unstated figures.
+3. When answering live rates, prices, or financial queries (such as gold/silver rates, taxes, or RBI figures), present exact figures with clear units (e.g., 24K, 22K, 18K per 1 gram and 10 grams in ₹ INR), city/regional rates if available in the sources, and a clean Markdown table.
+4. Cite facts inline using exact numbered Markdown links like [[1]](exact-url) or [Source Name](exact-url).
+5. NEVER invent, modify, or hallucinate URLs or numbers. Only use exact URLs and figures from the search results above; if a requested figure is absent across sources, explicitly state it was not found.
+6. Prioritize the most recent timestamps when multiple sources provide conflicting information.`;
     } else if (searchResults && searchResults.length > 0) {
       const groundingSnippet = searchResults
         .map(
@@ -400,6 +397,7 @@ STRICT CITATION & ACCURACY RULES:
     if (isStreaming) {
       const rawModel = body.model || body.modelOverride || "";
       const isCodingIntent =
+        isCodeModeNoSearch ||
         intentClassification.intent === "APP_PREVIEW" ||
         intentClassification.intent === "PCB_HARDWARE" ||
         intentClassification.intent === "PYTHON_WASM";
@@ -534,7 +532,7 @@ STRICT CITATION & ACCURACY RULES:
                   let timeoutId: NodeJS.Timeout | null = null;
                   try {
                     const nimController = new AbortController();
-                    const timeoutDuration = i === 0 ? 11000 : 6000;
+                    const timeoutDuration = i === 0 ? 12000 : 8000;
                     timeoutId = setTimeout(() => {
                       if (!streamStarted) {
                         console.warn(`[LOT CHAT] Candidate ${candidate} queued > ${timeoutDuration}ms. Auto-switching to fast fallback...`);
@@ -542,24 +540,30 @@ STRICT CITATION & ACCURACY RULES:
                       }
                     }, timeoutDuration);
 
+                    const isEverydayOnly = !isDeepIntent && !isCodingIntent;
+                    const nimPayload: Record<string, any> = {
+                      model: candidate,
+                      messages: modelMessages,
+                      temperature:
+                        typeof body.temperature === "number"
+                          ? body.temperature
+                          : liveSources.length > 0
+                          ? 0.1
+                          : 0.3,
+                      max_tokens: typeof body.maxTokens === "number" ? body.maxTokens : 4096,
+                      stream: true,
+                    };
+                    if (isEverydayOnly && candidate.includes("nemotron")) {
+                      nimPayload.chat_template_kwargs = { enable_thinking: false };
+                    }
+
                     const nimRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
                       method: "POST",
                       headers: {
                         "Content-Type": "application/json",
                         Authorization: `Bearer ${apiKey.trim()}`,
                       },
-                      body: JSON.stringify({
-                        model: candidate,
-                        messages: modelMessages,
-                        temperature:
-                          typeof body.temperature === "number"
-                            ? body.temperature
-                            : liveSources.length > 0
-                            ? 0.1
-                            : 0.3,
-                        max_tokens: typeof body.maxTokens === "number" ? body.maxTokens : 4096,
-                        stream: true,
-                      }),
+                      body: JSON.stringify(nimPayload),
                       signal: nimController.signal,
                     });
 

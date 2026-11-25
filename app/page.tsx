@@ -80,6 +80,8 @@ export default function Home() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [inputDraft, setInputDraft] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editNonce, setEditNonce] = useState(0);
 
   // LOT-OS Conversation Mode State
   const [activeMode, setActiveMode] = useState<LotOsMode>("chat");
@@ -218,6 +220,8 @@ export default function Home() {
   const handleSelectConversation = (id: string) => {
     setActiveConvId(id);
     setStoredCurrentConvId(id);
+    setEditingMessageId(null);
+    setInputDraft("");
     setSidebarOpen(false);
   };
 
@@ -225,6 +229,7 @@ export default function Home() {
     setActiveConvId(null);
     setStoredCurrentConvId(null);
     setSidebarOpen(false);
+    setEditingMessageId(null);
     clearInputDraft(activeConvId);
     setInputDraft("");
     setAgentFiles({});
@@ -340,9 +345,16 @@ export default function Home() {
     }
   };
 
-  const handleEditMessage = (_messageId: string, content: string) => {
-    // Populate the clicked prompt back into the input box for user editing without premature submission
+  const handleEditMessage = (messageId: string, content: string) => {
+    // Track which turn is being edited so submitting replaces it and regenerates from that point
+    setEditingMessageId(messageId);
     setInputDraft(content);
+    setEditNonce((n) => n + 1);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setInputDraft("");
   };
 
   const handleStopGeneration = () => {
@@ -389,6 +401,8 @@ export default function Home() {
     }
 
     const activeFocus = overrideFocus || searchFocus;
+    const activeEditId = editingMessageId;
+    setEditingMessageId(null);
     clearInputDraft(activeConvId);
     setInputDraft("");
 
@@ -417,6 +431,13 @@ export default function Home() {
       });
     }
 
+    const editIndex =
+      activeEditId && currentConv
+        ? currentConv.messages.findIndex((m) => m.id === activeEditId)
+        : -1;
+    const baseMessages =
+      editIndex >= 0 ? currentConv.messages.slice(0, editIndex) : currentConv.messages;
+
     const userMessage: Message = {
       id: nextMessageId(),
       role: "user",
@@ -440,7 +461,7 @@ export default function Home() {
         if (c.id !== targetConvId) return c;
         return {
           ...c,
-          messages: [...c.messages, userMessage, initialAssistantMessage],
+          messages: [...baseMessages, userMessage, initialAssistantMessage],
           updatedAt: Date.now(),
         };
       });
@@ -545,7 +566,7 @@ export default function Home() {
       const requestBody = isDeepResearch
         ? {
             query: content,
-            messages: [...currentConv.messages, userMessage].map((m) => ({
+            messages: [...baseMessages, userMessage].map((m) => ({
               role: m.role,
               content: m.content,
             })),
@@ -557,18 +578,18 @@ export default function Home() {
           }
         : isCodingAgentQuery
         ? {
-            messages: [...currentConv.messages, userMessage].map((m) => ({
+            messages: [...baseMessages, userMessage].map((m) => ({
               role: m.role,
               content: m.content,
             })),
             files: agentFiles,
           }
         : {
-            messages: [...currentConv.messages, userMessage].map((m) => ({
+            messages: [...baseMessages, userMessage].map((m) => ({
               role: m.role,
               content: m.content,
             })),
-            summary: currentConv.summary || "",
+            summary: editIndex >= 0 ? "" : currentConv.summary || "",
             model: selectedModel,
             mode: activeMode,
             customPrompt,
@@ -1283,6 +1304,9 @@ export default function Home() {
                 onOpenLotCode={() => setIsAgentWorkspaceOpen(true)}
                 onOpenBrowserAgent={() => setIsBrowserAgentOpen(true)}
                 inputDraft={inputDraft}
+                editNonce={editNonce}
+                isEditing={Boolean(editingMessageId)}
+                onCancelEdit={handleCancelEdit}
               />
             </WorkspaceErrorBoundary>
           </div>

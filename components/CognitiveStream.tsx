@@ -58,6 +58,9 @@ export interface CognitiveStreamProps {
   onOpenLotCode?: () => void;
   onOpenBrowserAgent?: () => void;
   inputDraft?: string;
+  editNonce?: number;
+  isEditing?: boolean;
+  onCancelEdit?: () => void;
   isCanvasVisible?: boolean;
   onToggleCanvas?: () => void;
 }
@@ -160,6 +163,9 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
   onOpenLotCode,
   onOpenBrowserAgent,
   inputDraft = "",
+  editNonce = 0,
+  isEditing = false,
+  onCancelEdit,
   isCanvasVisible = true,
   onToggleCanvas,
 }) => {
@@ -316,6 +322,9 @@ export const CognitiveStream: React.FC<CognitiveStreamProps> = ({
           onOpenLotCode={onOpenLotCode}
           onOpenBrowserAgent={onOpenBrowserAgent}
           externalInput={inputDraft}
+          editNonce={editNonce}
+          isEditing={isEditing}
+          onCancelEdit={onCancelEdit}
           searchFocus={searchFocus}
           onSearchFocusChange={onSearchFocusChange}
           activeMode={mode}
